@@ -5,3 +5,11 @@ from the console
 - modify gpu mem : eg 256 for graphic
 - modify keyboard
 - activate ssh
+- sudo apt-get update && sudo apt-get -y upgrade
+- sudo apt-get install -y git
+- cd /tmp
+- git clone https://github.com/minscof/rpi3.git
+- cd rpi3/tmp
+- chmod +x *.sh
+
+
