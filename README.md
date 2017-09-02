@@ -12,5 +12,7 @@ from the console
 - cd rpi3
 - chmod -R +x tmp/*.sh
 - tmp/modify_user.sh
+- tmp/modify_iptables.sh
+- tmp/add_video2fstab.sh
 
 
