@@ -9,7 +9,8 @@ from the console
 - sudo apt-get install -y git
 - cd /tmp
 - git clone https://github.com/minscof/rpi3.git
-- cd rpi3/tmp
-- chmod +x *.sh
+- cd rpi3
+- chmod -R +x tmp/*.sh
+- tmp/modify_user.sh
 
 
