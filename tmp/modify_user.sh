@@ -19,6 +19,7 @@ else
 	then
 		#we are connected with the temp user
 		sudo -s usermod -l $newuser -d /home/$newuser -m "$olduser"
+		sudo -s groupmod -n $newuser $olduser
 		echo "$NORMAL Please logoff now and reconnect with the user $GREEN $newuser"
 		echo "$NORMAL Then, you can change the password for this user : $GREEN $newuser"
 	else
