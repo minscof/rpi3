@@ -34,7 +34,6 @@ fi
 #
 #                expand filesystem ensures that all of th sd card 
 #    
-#    smsc95xx.macaddr=b8:27:eb:f6:db:32  <= pour le rpi avec l'adresse .30 (nginx etc..) à ajouter dans /boot/cmdline
 #
 # Automatisation de l'installation du serveur jeedom
 #
@@ -60,27 +59,35 @@ set_parameter () {
 
 echo "${green}$(tr -d '\0' </proc/device-tree/model)${white}"
 
-myIP=$(ip a s|sed -ne '/127.0.0.1/!{s/^[ \t]*inet[ \t]*\([0-9.]\+\)\/.*$/\1/p}'|grep 192)
+prefix=($(echo ${lan_network} | tr "." " "))
+prefix=${prefix[0]}.${prefix[1]}
+myIP=$(ip a s|sed -ne '/127.0.0.1/!{s/^[ \t]*inet[ \t]*\([0-9.]\+\)\/.*$/\1/p}'|grep ${prefix})
 echo "Ip address=${green}${myIP}${white}"
 CEC_OSD="inconnu"
+role="inconnu"
 case ${myIP} in
   ${jeedomSec_ip})
 	sudo sh -c "echo ${jeedomSec_name} > /etc/hostname";
-  	CEC_OSD=${jeedomSec_name};;
+  	CEC_OSD=${jeedomSec_name}
+  	role=${jeedomSec_role};;
   ${kodi_ip})
 	sudo sh -c "echo ${kodi_name} > /etc/hostname";
-  	CEC_OSD=${kodi_name};;
+  	CEC_OSD=${kodi_name}
+  	role=${kodi_role};;
   ${jeedom_ip})
 	sudo sh -c "echo ${jeedom_name} > /etc/hostname";
-  	CEC_OSD=${jeedom_name};;
+  	CEC_OSD=${jeedom_name}
+  	role=${jeedom_role};;
   ${parent_ip})
 	sudo sh -c "echo ${parent_name} > /etc/hostname";
-  	CEC_OSD=${parent_name};;
+  	CEC_OSD=${parent_name}
+  	role=${parent_role};;
   *)
 	CEC_OSD="inconnu"
 	echo "${red}RPI unknown in configuration file, please add it : ${myIP}${white}";;
 esac
 echo "Name=${green}$(cat /etc/hostname)${white}"
+echo "Role=${green}${role}${white}"
 
 case ${CEC_OSD} in
   kodi) GPU_MEM="256";;
@@ -122,7 +129,7 @@ set_parameter "/boot/config.txt" "max_usb_current" "1"
 set_parameter "/boot/config.txt" "dtoverlay" "pi-disable-wifi"
 
 sudo systemctl stop wpa_supplicant
-sudo systemctl didable wpa_supplicant
+sudo systemctl disable wpa_supplicant
 	
 #désactiver le bluetooth interne si dongle externe
 set_parameter "/boot/config.txt" "dtoverlay" "pi-disable-bt"
@@ -168,7 +175,7 @@ sudo sed -i 's|^ExecStart=/usr/lib/bluetooth/bluetoothd$|ExecStart=/usr/lib/blue
 #
 # Mise à jour du système
 #
-
+echo "${cyan}Start upgrade this server${white}"
 sudo apt update
 sudo apt -y upgrade
 sudo apt -y autoremove
@@ -206,13 +213,16 @@ if \$programname == "CRON" and \$msg contains "watchdog" then stop
 EOF'
 
 #systemctl restart rsyslog
-echo "${cyan}End basic configuration of this server${white}"
+echo "${cyan}End basic and common configuration of this server${white}"
 
 install_jeedom () {
+	echo "${cyan}Start installation jeedom${white}"
 	wget -O- https://raw.githubusercontent.com/jeedom/core/master/install/install.sh | sudo bash
+	echo "${cyan}End installation jeedom${white}"
 }
 
 install_fing () {
+	echo "${cyan}Start installation fing${white}"
 	#fing
 	cd ~
 	mkdir fing
@@ -224,7 +234,8 @@ install_fing () {
 	wget https://www.fingbox.com/download?plat=arm&ext=deb
 	#wget https://39qiv73eht2y1az3q51pykkf-wpengine.netdna-ssl.com/wp-content/uploads/2018/02/FingKit_CLI_Linux_Debian.zip
 	mv download?plat=arm overlook-fing-3.0.deb
-	sudo dpkg -i overlook-fing-3.0.deb 
+	sudo dpkg -i overlook-fing-3.0.deb
+	echo "${cyan}End installation fing${white}"
 }
 
 
@@ -234,7 +245,7 @@ add_user_jeedom () {
 	if [ $(sudo grep "jeedom" /etc/sudoers.d/* | wc -l) == 0 ]; then 
 		sudo sh -c 'echo "jeedom ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/010_jeedom-nopasswd'
 	fi
-	sudo chown -R jeedom.jeedom /home/jeedom
+	sudo chown -R "jeedom"."jeedom" /home/jeedom
 }
 
 install_ssh () {
@@ -259,7 +270,7 @@ install_ssh () {
 	su - www-data
 	
 	#se mettre en tant que compte www-data  sudo su;su www-data ou sudo su - www-data
-	#s'assurer que la clé privé a comme nom id_rsa et non sshkey
+	#s'assurer que la clé privée a comme nom id_rsa et non sshkey
 	
 	ssh-keygen -b 2048 -t rsa -f /home/www-data/.ssh/id_rsa -C www-data -q -N ""
 	
@@ -278,6 +289,7 @@ install_ssh () {
 }
 
 install_ebus () {
+	echo "${cyan}Start installation ebus${white}"
 	cd ~
 	sudo apt -y install git autoconf automake g++ make libmosquitto-dev
 	git clone https://github.com/john30/ebusd.git
@@ -287,13 +299,22 @@ install_ebus () {
 	./src/ebusd/ebusd --help
 	sudo make install
 	git clone https://github.com/john30/ebusd-configuration.git
+	git clone https://github.com/minscof/ebusd-configuration.git my-ebusd-configuration
+	cp my-ebusd-configuration/ebusd-2.1.x/en/vaillant/08.bai.csv ebusd-configuration/ebusd-2.1.x/de/vaillant/08.bai.csv
+	cp my-ebusd-configuration/ebusd-2.1.x/en/vaillant/15.e7c.csv ebusd-configuration/ebusd-2.1.x/de/vaillant/15.e7c.csv
+	cp my-ebusd-configuration/ebusd-2.1.x/en/vaillant/bai.0010015384.inc ebusd-configuration/ebusd-2.1.x/de/vaillant/bai.0010015384.inc
 	if [ -d /etc/ebusd ]; then sudo mv /etc/ebusd /etc/ebusd.old; fi
 	sudo ln -s ${PWD}/ebusd-configuration/ebusd-2.1.x/de /etc/ebusd
-	sudo apt-get -y install mosquitto
+	
+	sudo sed -i "s#^EBUSD_OPTS.*#EBUSD_OPTS=\x27-d ${ebus_ip}:9999 -l /dev/null -c /etc/ebusd --scanconfig --latency=20000 --mqttport=1883 --mqttjson --accesslevel=\"*\" \x27#" /etc/default/ebusd
+	
+	
+	sudo apt-get -y install mosquitto mosquitto-clients
 	sudo cp contrib/debian/default/ebusd /etc/default/
 	sudo cp contrib/debian/systemd/ebusd.service /etc/systemd/system/
 	sudo systemctl enable ebusd
 	sudo service ebusd start
+	echo "${cyan}End installation ebus${white}"
 }
 
 install_audioBT () {
@@ -338,6 +359,7 @@ install_sshpass () {
 }
 
 install_cec () {
+echo "${cyan}Start installation hdmiCec${white}"
 	#cec-client	
 	sudo apt-get install libraspberrypi-dev 
 	sudo apt-get install cmake liblockdev1-dev libudev-dev libxrandr-dev python-dev swig
@@ -366,25 +388,28 @@ install_cec () {
 	chmod a+x *
 	chown root.root monitorHDMI
 	mv monitorHDMI /etc/init.d/
-	update-rc.d monitorHDMI defaults   	
+	update-rc.d monitorHDMI defaults 
+	echo "${cyan}End installation hdmiCec${white}"  	
 }		
 
 install_kodi () {
+echo "${cyan}Start installation kodi${white}"
 	sudo apt -y install kodi
-	mkdir -p ~/videos/mars
+	mkdir -p ~/videos/${nas_name}
 	dir=/home/${USER}
 	sudo ln -s ${dir} /storage
 	sudo apt-get -y install autofs
 	if [ -f /etc/auto.master ]; then
 		if [ $(grep -c ${USER} /etc/auto.master) == 0 ]; then
-			sudo sh -c "echo \"/home/${USER} /etc/auto.nfs --ghost,--timeout=60\" >> /etc/auto.master"
+			sudo sh -c "echo \"/home/${USER}/video /etc/auto.nfs --ghost,--timeout=60\" >> /etc/auto.master"
 		fi
 	else
 		sudo sh -c "echo \"/home/${USER}/video /etc/auto.nfs --ghost,--timeout=60\" >> /etc/auto.master"
 	fi
-	#sudo sh -c "echo \"mars      -rsize=8192,wsize=8292,timeo=14,intr,rw,uid=1000,gid=1000    ${nas_ip}:/media/multimedia2/videos\"  >> /etc/auto.nfs"
-	sudo sh -c "echo \"mars -fstype=nfs,rw   ${nas_ip}:/media/multimedia2/videos\"  >> /etc/auto.nfs"
+	#sudo sh -c "echo \"${nas_name}      -rsize=8192,wsize=8292,timeo=14,intr,rw,uid=1000,gid=1000    ${nas_ip}:${nas_volume}\"  >> /etc/auto.nfs"
+	sudo sh -c "echo \"${nas_name} -fstype=nfs,rw   ${nas_ip}:${nas_volume}\"  >> /etc/auto.nfs"
 	sudo systemctl restart autofs
+	echo "${cyan}End installation kodi${white}"
 }
 
 migrate_defaultUser2secureUser () {
@@ -432,6 +457,239 @@ install_mysensor () {
 	#...PiGatewaySerial.cpp:    #define _TTY_NAME "/dev/ttyMySensorsGateway"
 }
 
+install_nginx () {
+	echo "${cyan}Start installation nginx${white}"
+	#set -x
+	sudo apt-get -y install nginx
+	#remove listen ipv6
+	sudo sed -i '/.*::.*/ d' /etc/nginx/sites-available/default
+	#install again
+	sudo apt-get -y install nginx
+	
+	echo "${cyan}Create iptables rules${white}"
+	#add file for iptables
+	sudo sh -c "cat > /etc/iptables.firewall.rules <<-EOF
+	*filter
+
+	#  Allow all loopback (lo0) traffic and drop all traffic to 127/8 that doesn t use lo0
+	-A INPUT -i lo -j ACCEPT
+	-A INPUT -d 127.0.0.0/8 -j REJECT
+	
+	#  Accept all established inbound connections
+	-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+	
+	#  Allow all outbound traffic - you can modify this to only allow certain traffic
+	-A OUTPUT -j ACCEPT
+	
+	#  Allow HTTP and HTTPS connections from anywhere (the normal ports for websites and SSL).
+	-A INPUT -p tcp --dport 80 -j ACCEPT
+	-A INPUT -p tcp --dport 443 -j ACCEPT
+	
+	
+	# Allow  HTTP on port 8080 only from jeedom for kodi & kodiasgui plugin
+	-A INPUT -s ${lan_network}/24 -p tcp --dport 8080 -j ACCEPT
+	
+	# Allow  HTTP on port 8003 only from find (wifi geolocation)
+	-A INPUT -s ${lan_network}/24 -p tcp --dport 8003 -j ACCEPT
+	
+	# Allow  MQTT on port 1883 only from jeedom for ebusd
+	-A INPUT -s ${lan_network}/24 -p tcp --dport 1883 -j ACCEPT
+	
+	#  Allow SSH connections
+	#  The -dport number should be the same port number you set in sshd_config
+	#-A INPUT -p tcp -m state --state NEW --dport 22 -j ACCEPT
+	-A INPUT -s ${lan_network}/24 -p tcp -m state --state NEW --dport 22 -j ACCEPT
+	
+	# drop dropbox sync and add comment to remove log
+	-A INPUT -p udp --dport 17500 -j DROP -m comment --comment \"dropbox lan\"
+	
+	
+	#  Allow ping
+	-A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+	
+	#  Log iptables denied calls
+	-A INPUT -m limit --limit 5/min -j LOG --log-prefix \"iptables denied: \" --log-level 7
+	
+	#  Drop all other inbound - default deny unless explicitly allowed policy
+	-A INPUT -j DROP
+	-A FORWARD -j DROP
+	
+	COMMIT
+	EOF"
+	
+	#add file for logging iptables
+	sudo sh -c 'cat > /etc/rsyslog.d/iptables.conf <<-EOF
+	:msg, contains, "iptables" -/var/log/iptables.log
+	&~
+	EOF'
+	
+	echo "${cyan}Activate iptables rules${white}"
+	sudo /sbin/iptables-restore < /etc/iptables.firewall.rules
+	sudo sh -c "echo \"#!/bin/sh\" > /etc/network/if-pre-up.d/firewall"
+	sudo sh -c "echo \"/sbin/iptables-restore < /etc/iptables.firewall.rules\" >> /etc/network/if-pre-up.d/firewall"
+	
+	if [ ! -f /etc/nginx/dh4096.pem ]; then 
+		echo "${cyan}Create dh406.pem file, be patient more than 40 minutes ...${white}"
+		cd /etc/nginx
+		sudo openssl dhparam -out dh4096.pem 4096
+		cd ~
+	fi
+	
+	echo "${cyan}Get letsencrypt certificat${white}"
+	sudo apt-get -y install certbot
+	if [ ! -f /etc/letsencrypt/live/${webserver_name}/fullchain.pem ]; then
+		sudo systemctl stop nginx
+		sudo certbot certonly --standalone -d ${webserver_name}
+	fi
+	
+	
+	sudo sh -c 'cat > /etc/nginx/perfect-forward-secrecy.conf <<-EOF
+	##
+	# SSL Settings
+	##
+	
+	ssl_protocols TLSv1.2 TLSv1.3; # Dropping SSLv3, TLSv1 TLSv1.1 ref: POODLE
+	ssl_prefer_server_ciphers on;
+	ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384;
+	ssl_dhparam dh4096.pem;
+	EOF'
+	
+	sudo mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.ori
+	#configure nginx
+	sudo sh -c 'cat > /etc/nginx/nginx.conf <<-EOF
+	user www-data;
+	worker_processes 2;
+	pid /run/nginx.pid;
+	
+	events {
+	        worker_connections 768;
+	        # multi_accept on;
+	}
+	
+	http {
+	
+	        ##
+	        # Basic Settings
+	        ##
+	
+	        sendfile on;
+	        tcp_nopush on;
+	        tcp_nodelay on;
+	        #keepalive_timeout 65;
+	        types_hash_max_size 2048;
+	        server_tokens off;
+	
+	        server_names_hash_bucket_size 64;
+	        # server_name_in_redirect off;
+	
+	        include /etc/nginx/mime.types;
+	        default_type application/octet-stream;
+	
+	        
+	
+	        ##
+	        # Logging Settings
+	        ##
+	
+	        gzip on;
+	        gzip_disable "msie6";
+	
+	        # gzip_vary on;
+	        # gzip_proxied any;
+	        # gzip_comp_level 6;
+	        # gzip_buffers 16 8k;
+	        # gzip_http_version 1.1;
+	        # gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+	
+	        ##
+	        # Virtual Host Configs
+	        ##
+	
+	        include /etc/nginx/conf.d/*.conf;
+	        include /etc/nginx/sites-enabled/*;
+	        include /etc/nginx/perfect-forward-secrecy.conf;
+	
+	        ##
+	        # Harden nginx against DDOS
+	        ##
+
+	        client_header_timeout 10;
+	        client_body_timeout   10;
+	        keepalive_timeout     10 10;
+	        send_timeout          10;
+	}
+	EOF'	
+
+
+	#configure as reverse-proxy
+	sudo sh -c 'cat > /etc/nginx/conf.d/proxy.conf <<-EOF
+	proxy_redirect          off;
+	proxy_set_header        Host            $host;
+	proxy_set_header        X-Real-IP       $remote_addr;
+	proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+	client_max_body_size    10m;
+	client_body_buffer_size 128k;
+	client_header_buffer_size 64k;
+	proxy_connect_timeout   90;
+	proxy_send_timeout      90;
+	proxy_read_timeout      90;
+	proxy_buffer_size   16k;
+	proxy_buffers       32   16k;
+	proxy_busy_buffers_size 64k;
+	EOF'
+
+	#add jeedom website
+	sudo sh -c "cat > /etc/nginx/sites-available/jeedom <<-EOF
+	#Jeedom server
+	#proxy vers ${jeedom_ip} à la racine
+	upstream backend {
+			server ${jeedom_ip}:80;
+			server ${jeedomSec_ip}:80;
+	}
+
+	server {
+	        listen 80;
+	        server_name ${webserver_name};
+	        access_log /var/log/nginx/jeedom.access.log;
+	        error_log /var/log/nginx/jeedom.error.log;
+	        location / {
+	                proxy_pass      http://${jeedom_ip}/;
+	        }
+
+	server {
+	        listen 443 ssl http2;
+	        server_name ${webserver_name};
+
+
+	        ssl_certificate /etc/letsencrypt/live/${webserver_name}/fullchain.pem;
+	        ssl_certificate_key /etc/letsencrypt/live/${webserver_name}/privkey.pem;
+	        access_log /var/log/nginx/jeedom.access.log;
+	        error_log /var/log/nginx/jeedom.error.log;
+	        location / {
+	                proxy_pass      http://backend;
+	                proxy_set_header X-Real-IP \$remote_addr;
+	                proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+	                proxy_set_header X-Forwarded-Proto \$scheme;
+	        }
+
+	}
+	EOF"
+
+	sudo ln -s /etc/nginx/sites-available/jeedom /etc/nginx/sites-enabled/jeedom
+	sudo rm /etc/nginx/sites-enabled/default
+
+	echo "${cyan}Restart nginx${white}"
+	sudo systemctl restart nginx
+
+	echo "${cyan}End installation nginx${white}"
+}
+
+install_vpn () {
+	echo "${cyan}Start installation openvpn${white}"
+	echo "${red}...to be developped...${white}"
+	echo "${cyan}End installation openvpn${white}"
+}
+
 
 #
 # Installation de samba
@@ -448,7 +706,7 @@ install_mysensor () {
 
 #sudo systemctl start nmbd
 #sudo systemctl start smbd
-			
+
 
 #
 # Installation de logitechmediaserver
@@ -463,7 +721,7 @@ install_mysensor () {
 #latest_lms=$(wget -q -O - "http://www.mysqueezebox.com/update/?version=7.9.0&revision=1&geturl=1&os=deb")
 #lms_deb=$(echo ${latest_lms}|cut -d "/" -f8)
 #sudo wget -c -P ${cachedir} ${latest_lms}
-#sudo dpkg -i "${cachedir}/${lms_deb}"	
+#sudo dpkg -i "${cachedir}/${lms_deb}"
 
 #restaurer les préférences
 #sudo systemctl stop logitechmediaserver
@@ -493,7 +751,7 @@ install_mysensor () {
 #git clone https://github.com/billw2/rpi-clone.git
 #cd rpi-clone
 #sudo cp rpi-clone /usr/local/sbin
-	
+
 #sudo systemctl stop logitechmediaserver	
 #sudo systemctl stop nginx
 #sudo systemctl stop jeedom
@@ -502,13 +760,13 @@ install_mysensor () {
 #sudo systemctl stop cron
 #sudo systemctl stop smbd
 #sudo systemctl stop nmbd
-	
+
 #sudo umount /dev/sda2
 #sudo apt-get install dosfstools	
 #sudo rpi-clone sdb -f
-	
+
 #sudo mount -a
-#sudo systemctl start logitechmediaserver	
+#sudo systemctl start logitechmediaserver
 #sudo systemctl start nmbd
 #sudo systemctl start smbd
 #sudo systemctl start mysql
@@ -516,6 +774,18 @@ install_mysensor () {
 #sudo systemctl start php5-fpm
 #sudo systemctl start cron
 #sudo systemctl start nginx
-	
+
+modules=$(echo ${role} | tr "+" " ")
+echo "${cyan}List of modules to install on this server${white}"
+for module in ${modules}
+do
+    echo "Module=${cyan}\"${module}\"${white}"
+    case ${module} in
+    dmz)
+    	echo "Check configuration of module ${cyan}${module}${white} on this server"
+    	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
+    esac
+done
+
 
 echo "${cyan}End configuration of this server${white}"
