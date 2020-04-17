@@ -1,0 +1,172 @@
+Le module esp (nodemcu) doit avoir une led bleue constamment allumée
+(cf le firmware https://github.com/john30/ebusd-esp)
+
+http://192.168.0.50/
+
+=>> Build: 20171230
+Chip ID: 00109b61
+CPU frequency: 80
+Free heap: 37408
+Hostname: ebus-109b61
+ebusd device string: 192.168.0.50:9999
+ebusd connected: yes (inactive)
+eBUS signal: acquired
+
+
+Lancer le serveur ebusd sur rpi kodi
+systemctl start ebusd
+
+-> vérifier le fichier de configuration : /etc/default/ebusd
+-> vérifier que le répertoire /etc/ebusd existe et pointe sur la version anglaise des configurations ebusd 
+-> vérifier que la configuration du fichier ebusd-2.1.x/en/vaillant/08.bai.csv contient la référence au fichier bai.0010015384.inc
+-> vérifier que les  fichiers ebusd-2.1.x/en/vaillant/15.e7c.csv et ebusd-2.1.x/en/vaillant/bai.0010015384.inc sont présents
+-> vérifier que le fichier ebusd-2.1.x/en/vaillant/_templates.csv contient la définition de ecomode
+exemple qui fonctionne
+
+=>> EBUSD_OPTS="-d 192.168.0.50:9999 -l /var/log/ebusd.log -c /etc/ebusd  --scanconfig --latency=20000 --mqttport=1883 --mqttjson --accesslevel=* --httpport 8889"
+exemple pour la production sans log et sans accès http
+=>> EBUSD_OPTS='-d 192.168.0.50:9999 -l /dev/null -c /etc/ebusd --scanconfig --latency=20000 --mqttport=1883 --mqttjson --accesslevel="*" '
+
+Rechercher la chaudière et son fichier de configuration
+ebusctl scan 8
+=>> 08;Vaillant;BAI00;0316;0903;21;17;08;0010015384;3100;006048;N8
+
+
+ebusctl scan 15
+15;Vaillant;E7C00;0211;7402;21;16;38;0020118071;0082;046518;N9
+
+Vérifier que tout est ok
+ebusctl info
+=>> avant avril 2020
+version: ebusd 3.1.v3.1-24-g9246e9a
+update check: version 3.2 available, broadcast.csv: different version available, memory.csv: different version available, vaillant/08.bai.csv: different version available, vaillant/broadcast.csv: different version available, vaillant/errors.inc: different version available, vaillant/general.csv: different version available, vaillant/hcmode.inc: different version available
+access: *
+signal: acquired
+symbol rate: 43
+max symbol rate: 119
+min arbitration micros: 68
+max arbitration micros: 226
+min symbol latency: 5
+max symbol latency: 32
+reconnects: 0
+masters: 3
+messages: 403
+conditional: 2
+poll: 0
+update: 8
+address 03: master #11
+address 08: slave #11, scanned "MF=Vaillant;ID=BAI00;SW=0316;HW=0903", loaded "vaillant/bai.0010015384.inc" ([PROD='0010015384']), "vaillant/08.bai.csv"
+address 10: master #2
+address 15: slave #2, scanned "MF=Vaillant;ID=E7C00;SW=0211;HW=7402", loaded "vaillant/15.e7c.csv"
+address 31: master #8, ebusd
+address 36: slave #8, ebusd
+
+à partir d'avril 2020
+version: ebusd 3.4.v3.4-16-g9e152da
+access: *
+signal: acquired
+symbol rate: 23
+max symbol rate: 109
+min arbitration micros: 127
+max arbitration micros: 321
+min symbol latency: 5
+max symbol latency: 22
+reconnects: 0
+masters: 3
+messages: 400
+conditional: 2
+poll: 0
+update: 10
+address 03: master #11
+address 08: slave #11, scanned "MF=Vaillant;ID=BAI00;SW=0316;HW=0903", loaded "vaillant/bai.0010015384.inc" ([PROD='0010015384']), "vaillant/08.bai.csv"
+address 10: master #2
+address 15: slave #2, scanned "MF=Vaillant;ID=E7C00;SW=0211;HW=7402", loaded "vaillant/15.e7c.csv"
+address 31: master #8, ebusd
+address 36: slave #8, ebusd
+
+
+
+Liste des registres ayant une valeur
+ebusctl find -d
+
+T° demandée pour l'eau du chauffage
+ebusctl read -f -c bai FlowTempDesired
+=>54
+depuis le 20/10/19 0.00
+
+T° instantanée de la pièce où est le thermostat
+ebusctl read -f -c e7c RoomTemp
+
+T° de consigne du thermostat
+ebusctl read -f -c e7c ROCRoomSet
+
+T° de consigne la pièce où est le thermostat
+ebusctl read -f -c e7c ROCRoomSet
+
+Modifier la valeur de la température de consigne du thermostat
+ebusctl write  -c e7c ROCRoomSet 20
+
+Lire les registres contenant des données
+ebusctl find -d
+====================
+Connexion à jeedom
+
+Configurer le serveur ebusd pour dialoguer avec le serveur mosquitto
+=>> /etc/default/ebusd  :: --mqttport=1883
+lancement à la main du serveur ebusd
+sudo /usr/bin/ebusd -d 192.168.0.50:9999 -l /var/log/ebusd.log -c /etc/ebusd  --scanconfig --latency=20000 --mqttport=1883 --mqttjson --accesslevel="*"
+
+
+EBUSD_OPTS='-d 192.168.0.50:9999 -l /dev/null -c /etc/ebusd  --scanconfig --latency=20000 --mqttport=1883 --mqttjson --accesslevel="*" '
+
+Lancer le serveur mosquitto
+sudo systemctl start mosquitto
+
+=> activer le plugin jMQTT en relation avec le serveur mosquitto
+====================
+tester la publication via mqtt des données reçues
+mosquitto_sub -h [MQTT Host] -t '#' -v
+[MQTT Host] = 127.0.0.1 si même machine, sinon 192.168.0.30 a priori
+ex : mosquitto_sub -h 127.0.0.1 -t '#' -v
+=====================
+activer les logs d'ebusd 
+-l, --logfile=FILE
+Write log to FILE (only for daemon) [/var/log/ebusd.log]
+
+--log="AREAS LEVEL"
+Only write log for matching AREA(S) below or equal to LEVEL [all notice].
+This is an alternative form to using --logareas/--logevel and allows to specify an individual level for each area by using the option multiple times.
+E.g. for having only bus messages in info level and all other in error level, use --log="all error" --log="bus info".
+======================
+divers
+monitorer ebusd connected: yes pour véifier le bon fonctionnement (http://192.168.0.50/ cf https://ebus.github.io/adapter/index.en.html)
+
+voir ce wiki : https://wiki.fhem.de/wiki/EBUS
+vérifier la configuration
+sudo /usr/bin/ebusd  -c /etc/ebusd  --checkconfig
+
+=====================
+Problèmes rencontrés
+
+15/2/2019 : la mise à jour de la consigne dans le thermostat ex7 ne fonctionne plus à partir de Jeedom
+Symptôme : aucune erreur nulle part, mais la modification de la T de consigne (ROCRoomSet) à partir de jeedom n'a pas d'effet. En revanche la commande fonction à partir de ebusctl :ebusctl write  -c e7c ROCRoomSet 16
+Résolution : arrêt relance du serveur ebusd : retour à la normale : sudo systemctl stop ebusd
+Essais infructueux : relance du daemon jmqtt sur jeedom : aucun changement
+Analyse : c'est peut-être la jonction moquitto vers ebusd qui ne marchait pas bien, en relançant ebusd, on a rétabli cette jonction dans ce sens; un redémarrage du serveur mosquitto aurait peut-être produit le même résultat
+Monitoring : scénario Chaudière/Monitoring pour contrôler chaque jour depuis jeedom qu'un changement de consigne est bien suivi d'effet
+
+19/2/2019 : incident identique 
+Résolution : identique précédent : redémarrage du serveur ebusd
+Analyse : l'arrêt/relance du serveur mosquitto n'a pas suffit à rétablir la jonction mosquitto vers ebusd : le problème semble donc venir du serveur ebusd qui n'écoute plus les ordres venant de mosquitto
+
+28/2/2019 : alerte à nouveau incident mais cause différente
+Résolution : le thermostat EX7 était débranché : écran pas assez appuyé sur la structure, il était donc impossible de changer quoique ce soit comme valeur sur le thermostat et donc de contrôler la chaudière
+
+16/4/2020 : fichier "vaillant/bai.0010015384.inc" non loaded
+Résolution : il faut que le fichier vaillant/_templates.csv contient la définition du type ecomode, sinon ajouter cette déf : ecomode,UCH,0=eco;1=comfort
+Analyse : le fichier a une erreur en ligne 149 avec le fieldtype ECOMODE
+2020-04-16 22:03:44.355 [main error] error executing instructions: ERR: element not found, last error: error loading "vaillant/bai.0010015384.inc" for "08": ERR: element not found vaillant/bai.0010015384.inc:149: ERR: element not found, field type ECOMODE in field 0
+=> commentaire de la ligne en question avec un #
+-> nouvelle erreur
+2020-04-16 22:09:26.022 [main error] error reading scan config file vaillant/08.bai.csv for ID "bai00", SW0316, HW0903: ERR: missing argument, vaillant/08.bai.csv:20: ERR: missing argument, circuit
+-> la configuration prise en compte était celle de langue allemande (de) : amélioration avec la langue anglaise (en)

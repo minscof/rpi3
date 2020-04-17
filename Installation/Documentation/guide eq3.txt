@@ -1,0 +1,18 @@
+eq3 - equiva - eqiva
+Mettre les piles -> régler la date et l'heure en utilisant la molette
+Attendre que le robinet fasse reculr sa valve : il affiche ins pour insérer
+Mettre le robinet sur le radiateur quand le moteur a fini de fonctionner (valve le plus en retrait)
+Une fois le robinet mis, appuyer sur la molette, le robinet passe en mode adaptation (ada => il calibre sa valve)
+En appuyant plus de 3s sur la molette, on passe en mode appairage avec l'appli caloBT, sur android, il demande le code pin qui est brièvement affiché pour associer le dispositif
+activer le bluetooth
+- appuyer pendant plus de 3s sur le bouton Mode/menu
+- sélectionner avec la molette le menu bLE et appuyer brièvement sur la molette
+- l'écran affiche alors on ou off ; on = veut dire que le bluetooth est désactivé, il faut alors appuyer brièvement sur la molette pour activer le bluetooth
+   en revanche, si off apparait, il ne faut rien faire pour ne pas désactiver le bluetooth
+   
+   
+   
+ Pour jeedom 
+ 
+ Il faut installer expect sudo apt install inspect
+ Il faut créer le répertoire /var/www/html/plugins/script/docs et mettre www-data comme propriétaire

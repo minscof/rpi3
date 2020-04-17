@@ -2,10 +2,6 @@
 #this shell must be launched with user privilege that can do sudo command
 #set -x
 
-#cleartext password inside !
-#this shell must be launched with root privilege
-#set -x
-
 . $(dirname "${0}")/colors.sh
 . $(dirname "${0}")/config_rpi.sh
 . $(dirname "${0}")/secrets.sh
@@ -290,6 +286,7 @@ install_ssh () {
 
 install_ebus () {
 	echo "${cyan}Start installation ebus${white}"
+	echo "${cyan}Build ebusd server${white}"
 	cd ~
 	sudo apt -y install git autoconf automake g++ make libmosquitto-dev
 	git clone https://github.com/john30/ebusd.git
@@ -299,28 +296,65 @@ install_ebus () {
 	./src/ebusd/ebusd --help
 	sudo make install
 	git clone https://github.com/john30/ebusd-configuration.git
-	git clone https://github.com/minscof/ebusd-configuration.git my-ebusd-configuration
-	cp my-ebusd-configuration/ebusd-2.1.x/en/vaillant/08.bai.csv ebusd-configuration/ebusd-2.1.x/de/vaillant/08.bai.csv
-	cp my-ebusd-configuration/ebusd-2.1.x/en/vaillant/15.e7c.csv ebusd-configuration/ebusd-2.1.x/de/vaillant/15.e7c.csv
-	cp my-ebusd-configuration/ebusd-2.1.x/en/vaillant/bai.0010015384.inc ebusd-configuration/ebusd-2.1.x/de/vaillant/bai.0010015384.inc
+	
 	if [ -d /etc/ebusd ]; then sudo mv /etc/ebusd /etc/ebusd.old; fi
-	sudo ln -s ${PWD}/ebusd-configuration/ebusd-2.1.x/de /etc/ebusd
+	sudo ln -s ${PWD}/ebusd-configuration/ebusd-2.1.x/en /etc/ebusd
+	
+	if [ $(/usr/bin/ebusd  -c /etc/ebusd  --checkconfig | wc -l) != 3 ]; then
+		echo "${red}Error with standard ebusd configuration server${white}"
+		/usr/bin/ebusd  -c /etc/ebusd  --checkconfig
+		echo "${red}Exit installation ebus${white}"
+		return 20
+	fi
+	
+	git clone https://github.com/minscof/ebusd-configuration.git my-ebusd-configuration
+	
+	if [ $(grep -c "ecomode" /etc/ebusd/vaillant/_templates.csv) == 0 ]; then
+		echo "Modify ${yellow}_templates.csv${white}"
+		sudo sh -c 'echo "ecomode,UCH,0=eco;1=comfort0" >> /etc/ebusd/vaillant/_templates.csv'
+	fi
+	
+	if [ $(grep -c "0010015384" /etc/ebusd/vaillant/08.bai.csv) == 0 ]; then
+		echo "Modify ${yellow}08.bai.csv${white}"
+		sudo sed -i "/.*fallbacks.*/i\\[PROD='0010015384'\]\!load,bai\.0010015384\.inc,,," /etc/ebusd/vaillant/08.bai.csv
+		#cp my-ebusd-configuration/ebusd-2.1.x/en/vaillant/08.bai.csv ebusd-configuration/ebusd-2.1.x/en/vaillant/08.bai.csv
+	fi
+	
+	if [ ! -f /etc/ebusd/vaillant/15.e7c.csv ]; then
+		echo "Add ${yellow}15.e7c.csv${white}"
+		sudo cp my-ebusd-configuration/ebusd-2.1.x/en/vaillant/15.e7c.csv /etc/ebusd/vaillant/15.e7c.csv
+	fi
+	
+	if [ ! -f /etc/ebusd/vaillant/bai.0010015384.inc ]; then
+		echo "Add ${yellow}bai.0010015384.inc${white}"
+		sudo cp my-ebusd-configuration/ebusd-2.1.x/en/vaillant/bai.0010015384.inc /etc/ebusd/vaillant/bai.0010015384.inc
+	fi
+	
+	if [ $(/usr/bin/ebusd  -c /etc/ebusd  --checkconfig | wc -l) != 3 ]; then
+		echo "${red}Error with personalized ebusd configuration server${white}"
+		/usr/bin/ebusd  -c /etc/ebusd  --checkconfig
+		echo "${red}Exit installation ebus${white}"
+		return 21
+	fi
+	
 	
 	sudo sed -i "s#^EBUSD_OPTS.*#EBUSD_OPTS=\x27-d ${ebus_ip}:9999 -l /dev/null -c /etc/ebusd --scanconfig --latency=20000 --mqttport=1883 --mqttjson --accesslevel=\"*\" \x27#" /etc/default/ebusd
 	
-	
 	sudo apt-get -y install mosquitto mosquitto-clients
+	echo "${cyan}Start mosquitto server${white}"
+	sudo systemctl restart mosquitto
 	sudo cp contrib/debian/default/ebusd /etc/default/
 	sudo cp contrib/debian/systemd/ebusd.service /etc/systemd/system/
 	sudo systemctl enable ebusd
-	sudo service ebusd start
+	echo "${cyan}Start ebusd server${white}"
+	sudo systemctl restart ebusd
 	echo "${cyan}End installation ebus${white}"
 }
 
 install_audioBT () {
+	echo "${cyan}Start configuration bluetooth audio${white}"
 	#Bluetooth section
 	
-		
 	#pour transformer le rpi en récepteur audio bluetooth
 	#https://gist.github.com/mill1000/74c7473ee3b4a5b13f6325e9994ff84c
 	# s'assurer que le user est bien dans le groupe bluetooth
@@ -344,6 +378,7 @@ install_audioBT () {
 	\[agent\] Confirm passkey xxxxxx \(yes/no\): yes et du côté de l'équipement valider aussi ce code		
 	mettre l'ampli en mode input auto et non coax, pour tester la carte son usb	
 	aplay -D hw:CARD=Device piano2.wav
+	echo "${cyan}End configuration bluetooth audio${white}"
 }
  
 install_sshpass () {
@@ -359,7 +394,7 @@ install_sshpass () {
 }
 
 install_cec () {
-echo "${cyan}Start installation hdmiCec${white}"
+	echo "${cyan}Start installation hdmiCec${white}"
 	#cec-client	
 	sudo apt-get install libraspberrypi-dev 
 	sudo apt-get install cmake liblockdev1-dev libudev-dev libxrandr-dev python-dev swig
@@ -393,7 +428,7 @@ echo "${cyan}Start installation hdmiCec${white}"
 }		
 
 install_kodi () {
-echo "${cyan}Start installation kodi${white}"
+	echo "${cyan}Start installation kodi${white}"
 	sudo apt -y install kodi
 	mkdir -p ~/videos/${nas_name}
 	dir=/home/${USER}
@@ -503,7 +538,6 @@ install_nginx () {
 	# drop dropbox sync and add comment to remove log
 	-A INPUT -p udp --dport 17500 -j DROP -m comment --comment \"dropbox lan\"
 	
-	
 	#  Allow ping
 	-A INPUT -p icmp --icmp-type echo-request -j ACCEPT
 	
@@ -541,7 +575,6 @@ install_nginx () {
 		sudo systemctl stop nginx
 		sudo certbot certonly --standalone -d ${webserver_name}
 	fi
-	
 	
 	sudo sh -c 'cat > /etc/nginx/perfect-forward-secrecy.conf <<-EOF
 	##
@@ -584,8 +617,6 @@ install_nginx () {
 	
 	        include /etc/nginx/mime.types;
 	        default_type application/octet-stream;
-	
-	        
 	
 	        ##
 	        # Logging Settings
@@ -659,7 +690,6 @@ install_nginx () {
 	server {
 	        listen 443 ssl http2;
 	        server_name ${webserver_name};
-
 
 	        ssl_certificate /etc/letsencrypt/live/${webserver_name}/fullchain.pem;
 	        ssl_certificate_key /etc/letsencrypt/live/${webserver_name}/privkey.pem;
@@ -780,10 +810,29 @@ echo "${cyan}List of modules to install on this server${white}"
 for module in ${modules}
 do
     echo "Module=${cyan}\"${module}\"${white}"
+    echo "Check configuration of module ${cyan}${module}${white} on this server"
     case ${module} in
     dmz)
-    	echo "Check configuration of module ${cyan}${module}${white} on this server"
     	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
+    	;;
+    vpn)
+    	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
+    	;;
+    kodi)
+    	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
+    	;;
+    mqtt)
+    	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
+    	;;
+    ebusd)
+    	install_ebus
+    	;;
+    blea)
+    	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
+    	;;
+    *)
+   	    echo "Module ${red}${module} is unknown, skip...${white}"
+   	    ;;
     esac
 done
 

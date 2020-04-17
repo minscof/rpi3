@@ -1,0 +1,11 @@
+install fuse for google music
+
+prerequisit for libxml2
+sudo apt-get install libxml2-dev libxslt1-dev
+
+then
+sudo apt-get install fuse
+
+pip2 install https://github.com/terencehonles/fusepy/tarball/master
+pip2 install https://github.com/simon-weber/Unofficial-Google-Music-API/tarball/develop
+pip2 install https://github.com/EnigmaCurry/GMusicFS/tarball/master
