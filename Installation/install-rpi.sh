@@ -1,18 +1,76 @@
 #!/bin/bash
-#this shell must be launched with user privilege that can do sudo command
+############################################################################
+#
+# Usage: install-rpi.sh [options] file ...
+#
+# Count the number of lines in a given list of files.
+# Uses a for loop over all arguments.
+#
+# Options:
+#  -h        ... help message
+#  -v        ... verbose
+#  -a        ... configure all the modules for this host
+#  -m module ... configure only this module
+#
+# Limitations: 
+#  . only one option should be given; a second one overrides
+#  . must be launched with user privilege that can do sudo command
+#
+############################################################################
+
 #set -x
-
 . $(dirname "${0}")/colors.sh
-. $(dirname "${0}")/config_rpi.sh
-. $(dirname "${0}")/secrets.sh
 
-echo "${cyan}Start configuration of this server${white}"
+verbose=0
+# defaults
+modules=""
+
+print_help () {
+	no_of_lines=`cat $0 | awk 'BEGIN { n = 0; } \
+				/^$/ { print n; \
+				exit; } \
+				{ n++; }'`
+	echo "`head -$no_of_lines $0`"
+}
+
+while getopts "hvam:w:" option ; do
+	case ${option} in
+		h)	print_help
+			exit 0
+			;;
+		v)	verbose=1
+			;;
+		a)
+			;; 
+		m)	modules=${OPTARG}
+			;;
+		\?)	echo "${red}Invalid option ${yellow}-${option}${white}"
+			print_help
+			exit 1
+			;;
+	esac
+done
+
+shift "$((OPTIND-1))"
+
+if [ $# -lt 1 ]; then
+	echo "Usage: $0 file ..."
+	exit 1
+fi
+
+if [ ${verbose} -eq 1 ]; then
+	echo "$0 verbose activated" 
+fi
 
 # Everything else needs to be run as root
 if [ $(id -u) -eq 0 ]; then
-  echo "${red}Script must not be run as root. Try './install-rpi'${white}"
-  exit 1
+	echo "${red}Script must not be run as root. Try './install-rpi'${white}"
+	exit 2
 fi
+
+echo "${cyan}Start configuration of this server${white}"
+. $(dirname "${0}")/config_rpi.sh
+. $(dirname "${0}")/secrets.sh
 
 #
 # Partir d'un raspberry avec la distribution raspbian installée et opérationnelle, de préférence sur un disque SSD plutôt qu'une carte sd pas assez fiable
@@ -52,163 +110,184 @@ set_parameter () {
 	fi
 }
 
+function_exists() {
+    declare -f -F $1 > /dev/null
+    return $?
+}
 
-echo "${green}$(tr -d '\0' </proc/device-tree/model)${white}"
+function_exists function_name && echo Exists || echo No such function
 
-prefix=($(echo ${lan_network} | tr "." " "))
-prefix=${prefix[0]}.${prefix[1]}
-myIP=$(ip a s|sed -ne '/127.0.0.1/!{s/^[ \t]*inet[ \t]*\([0-9.]\+\)\/.*$/\1/p}'|grep ${prefix})
-echo "Ip address=${green}${myIP}${white}"
-CEC_OSD="inconnu"
-role="inconnu"
-case ${myIP} in
-  ${jeedomSec_ip})
-	sudo sh -c "echo ${jeedomSec_name} > /etc/hostname";
-  	CEC_OSD=${jeedomSec_name}
-  	role=${jeedomSec_role};;
-  ${kodi_ip})
-	sudo sh -c "echo ${kodi_name} > /etc/hostname";
-  	CEC_OSD=${kodi_name}
-  	role=${kodi_role};;
-  ${jeedom_ip})
-	sudo sh -c "echo ${jeedom_name} > /etc/hostname";
-  	CEC_OSD=${jeedom_name}
-  	role=${jeedom_role};;
-  ${parent_ip})
-	sudo sh -c "echo ${parent_name} > /etc/hostname";
-  	CEC_OSD=${parent_name}
-  	role=${parent_role};;
-  *)
+identify_system () {
+	echo "${cyan}Start identify this server${white}"
+	prefix=($(echo ${lan_network} | tr "." " "))
+	prefix=${prefix[0]}.${prefix[1]}
+	myIP=$(ip a s|sed -ne '/127.0.0.1/!{s/^[ \t]*inet[ \t]*\([0-9.]\+\)\/.*$/\1/p}'|grep ${prefix})
+	echo "Ip address=${green}${myIP}${white}"
 	CEC_OSD="inconnu"
-	echo "${red}RPI unknown in configuration file, please add it : ${myIP}${white}";;
-esac
-echo "Name=${green}$(cat /etc/hostname)${white}"
-echo "Role=${green}${role}${white}"
+	role="inconnu"
+	case ${myIP} in
+	  ${jeedomSec_ip})
+		sudo sh -c "echo ${jeedomSec_name} > /etc/hostname";
+	  	CEC_OSD=${jeedomSec_name}
+	  	role=${jeedomSec_role};;
+	  ${kodi_ip})
+		sudo sh -c "echo ${kodi_name} > /etc/hostname";
+	  	CEC_OSD=${kodi_name}
+	  	role=${kodi_role};;
+	  ${jeedom_ip})
+		sudo sh -c "echo ${jeedom_name} > /etc/hostname";
+	  	CEC_OSD=${jeedom_name}
+	  	role=${jeedom_role};;
+	  ${parent_ip})
+		sudo sh -c "echo ${parent_name} > /etc/hostname";
+	  	CEC_OSD=${parent_name}
+	  	role=${parent_role};;
+	  *)
+		CEC_OSD="inconnu"
+		echo "${red}RPI unknown in configuration file, please add it : ${myIP}${white}";;
+	esac
+	echo "Name=${green}$(cat /etc/hostname)${white}"
+	echo "Role=${green}${role}${white}"
+	echo "${cyan}End identify this server${white}"	
+}
 
-case ${CEC_OSD} in
-  kodi) GPU_MEM="256";;
-  *) GPU_MEM="16";;
-esac
-
-case ${CEC_OSD} in
-  kodi|parent) DTPARAM=AUDIO="on";;
-  *) DTPARAM=AUDIO="off";;
-esac
-
-case ${CEC_OSD} in
-  parent) DTPARAM=act_led_trigger="none";;
-  *) DTPARAM=act_led_trigger="heartbeat";;
-esac
-
-#disable ipv6
-file="/boot/cmdline.txt"
-sudo sed -i "/ipv6/!s/$/ ipv6.disable=1/" ${file}
-sudo sed -i "/ipv6.disable=0/ipv6.disable=1/" ${file}
-
-if [ $(grep -c "noipv6rs" /etc/dhcpcd.conf) == 0 ]; then 
-    sudo sh -c 'echo "# disable ipv6 in /etc/dhcpcd.conf " >> /etc/dhcpcd.conf'
-    sudo sh -c 'echo " " >> /etc/dhcpcd.conf'
-	sudo sh -c 'echo "noipv6rs" >> /etc/dhcpcd.conf'
-	sudo sh -c 'echo "noipv6" >> /etc/dhcpcd.conf'
-fi
-
-
-set_line "/boot/config.txt" "#[jeedom]"
-
-#max memory for server (min for graphic..)
-set_parameter "/boot/config.txt" "gpu_mem" ${GPU_MEM}
-
-#max de puissance sur les ports USB
-set_parameter "/boot/config.txt" "max_usb_current" "1"
-
-#désactiver le wifi
-set_parameter "/boot/config.txt" "dtoverlay" "pi-disable-wifi"
-
-sudo systemctl stop wpa_supplicant
-sudo systemctl disable wpa_supplicant
+configure_localization () {
+	echo "${cyan}Start localization this server${white}"
+	echo "${green}$(tr -d '\0' </proc/device-tree/model)${white}"
+	L='fr' && sudo sed -i 's/XKBLAYOUT=\"\w*"/XKBLAYOUT=\"'$L'\"/g' /etc/default/keyboard
+	#modify keyboard
 	
-#désactiver le bluetooth interne si dongle externe
-set_parameter "/boot/config.txt" "dtoverlay" "pi-disable-bt"
-
-#réduire la fréquence GPU pour être compatible RPI2 [rpi3 default = 400]
-#sudo echo "gpu_freq=250" >> /boot/config.txt
-
-#nom sur la connexion hdmi-cec
-set_parameter "/boot/config.txt" "cec_osd_name" ${CEC_OSD}
-
-#interdire l'affichage de ce pi sur l'écran télé à son démarrage
-set_parameter "/boot/config.txt" "hdmi_ignore_cec_init" "1"
-
-# Enable audio (loads snd_bcm2835)
-set_parameter "/boot/config.txt" "dtparam=audio" ${DTPARAM=AUDIO}
+	timedatectl set-timezone Europe/Paris
+	echo "${cyan}End localization this server${white}"	
+}
 
 
-# Disable the ACT LED.
-#dtparam=act_led_trigger=none
-#dtparam=act_led_activelow=off
+configure_system () {
+	echo "${cyan}Start system configuration${white}"
 
-# Disable the PWR LED.
-#dtparam=pwr_led_trigger=none
-#dtparam=pwr_led_activelow=off
+	case ${CEC_OSD} in
+	  kodi) GPU_MEM="256";;
+	  *) GPU_MEM="16";;
+	esac
+	
+	case ${CEC_OSD} in
+	  kodi|parent) DTPARAM=AUDIO="on";;
+	  *) DTPARAM=AUDIO="off";;
+	esac
+	
+	case ${CEC_OSD} in
+	  parent) DTPARAM=act_led_trigger="none";;
+	  *) DTPARAM=act_led_trigger="heartbeat";;
+	esac
+	
+	#disable ipv6
+	file="/boot/cmdline.txt"
+	sudo sed -i "/ipv6/!s/$/ ipv6.disable=1/" ${file}
+	sudo sed -i "/ipv6.disable=0/ipv6.disable=1/" ${file}
+	
+	if [ $(grep -c "noipv6rs" /etc/dhcpcd.conf) == 0 ]; then 
+	    sudo sh -c 'echo "# disable ipv6 in /etc/dhcpcd.conf " >> /etc/dhcpcd.conf'
+	    sudo sh -c 'echo " " >> /etc/dhcpcd.conf'
+		sudo sh -c 'echo "noipv6rs" >> /etc/dhcpcd.conf'
+		sudo sh -c 'echo "noipv6" >> /etc/dhcpcd.conf'
+	fi
+	
+	
+	set_line "/boot/config.txt" "#[jeedom]"
+	
+	#max memory for server (min for graphic..)
+	set_parameter "/boot/config.txt" "gpu_mem" ${GPU_MEM}
+	
+	#max de puissance sur les ports USB
+	set_parameter "/boot/config.txt" "max_usb_current" "1"
+	
+	#désactiver le wifi
+	set_parameter "/boot/config.txt" "dtoverlay" "pi-disable-wifi"
+	
+	sudo systemctl stop wpa_supplicant
+	sudo systemctl disable wpa_supplicant
+		
+	#désactiver le bluetooth interne si dongle externe
+	set_parameter "/boot/config.txt" "dtoverlay" "pi-disable-bt"
+	
+	#réduire la fréquence GPU pour être compatible RPI2 [rpi3 default = 400]
+	#sudo echo "gpu_freq=250" >> /boot/config.txt
+	
+	#nom sur la connexion hdmi-cec
+	set_parameter "/boot/config.txt" "cec_osd_name" ${CEC_OSD}
+	
+	#interdire l'affichage de ce pi sur l'écran télé à son démarrage
+	set_parameter "/boot/config.txt" "hdmi_ignore_cec_init" "1"
+	
+	# Enable audio (loads snd_bcm2835)
+	set_parameter "/boot/config.txt" "dtparam=audio" ${DTPARAM=AUDIO}
+	
+	
+	# Disable the ACT LED.
+	#dtparam=act_led_trigger=none
+	#dtparam=act_led_activelow=off
+	
+	# Disable the PWR LED.
+	#dtparam=pwr_led_trigger=none
+	#dtparam=pwr_led_activelow=off
+	
+	
+	#remove sap error
+	sudo sed -i 's|^ExecStart=/usr/lib/bluetooth/bluetoothd$|ExecStart=/usr/lib/bluetooth/bluetoothd --noplugin=sap|' /lib/systemd/system/bluetooth.service
+	echo "${cyan}End system configuration${white}"
+}
 
-
-#Optimisation du swap
-
-#echo "vm.swappiness = 10" >> /etc/sysctl.conf
-set_parameter "/etc/sysctl.conf" "vm.swappiness" "10"
-
-
-sudo swapoff -a && swapon -a
-set_parameter "/etc/dphys-swapfile" "CONF_SWAPSIZE" "1024"
-sudo systemctl stop dphys-swapfile
-sudo systemctl start dphys-swapfile
-
-timedatectl set-timezone Europe/Paris
-
-
-#remove sap error
-sudo sed -i 's|^ExecStart=/usr/lib/bluetooth/bluetoothd$|ExecStart=/usr/lib/bluetooth/bluetoothd --noplugin=sap|' /lib/systemd/system/bluetooth.service
 #
 # Mise à jour du système
 #
-echo "${cyan}Start upgrade this server${white}"
-sudo apt update
-sudo apt -y upgrade
-sudo apt -y autoremove
-#sudo apt-get install rpi-update -y
-#sudo rpi-update
-
-#
-# Modification du fichier fstab - montage du SSD externe
-#
-#cd ~
-#mkdir music
-#modifier fstab pour ajouter
-#/dev/sda2     /home/jeedom/music  ext4 noatime,discard,defaults 0 0
-if [ $(grep -c "tmpfs" /etc/fstab) == 0 ]; then 
-	sudo sh -c 'echo "tmpfs /tmp/jeedom tmpfs defaults,noatime,nosuid,size=128m 0 0" >> /etc/fstab'
-fi
-
-
-optimize_ssd () {
-#SSD optimize
-	/etc/systemd/journald.conf
-	\[Journal\]
-	Storage=volatile
-	RuntimeMaxUse=30M
+upgrade_system () {
+	echo "${cyan}Start upgrade this server${white}"
+	sudo apt update
+	sudo apt -y upgrade
+	sudo apt -y autoremove
+	#sudo apt-get install rpi-update -y
+	#sudo rpi-update
+	echo "${cyan}End upgrade this server${white}"
 }
 
-#reduce logging : create  /etc/rsyslog.d/jeedom.conf
-sudo sh -c 'cat > /etc/rsyslog.d/jeedom.conf <<-EOF
-:msg, contains, "www-data" stop
-if \$programname == "sudo" and \$msg contains "session closed for user root" then stop
-if \$programname == "sudo" and \$msg contains "session opened for user root" then stop
-if \$programname == "CRON" and \$msg contains "jeeCron.php >> /dev/null" then stop
-if \$programname == "CRON" and \$msg contains "No MTA" then stop
-if \$programname == "CRON" and \$msg contains "watchdog" then stop
-EOF'
+optimize_drive () {
+	echo "${cyan}Start optimization for ssd or sdcard${white}"
+	#Optimisation du swap
+	
+	#echo "vm.swappiness = 10" >> /etc/sysctl.conf
+	set_parameter "/etc/sysctl.conf" "vm.swappiness" "10"
 
-#systemctl restart rsyslog
+	sudo swapoff -a && swapon -a
+	set_parameter "/etc/dphys-swapfile" "CONF_SWAPSIZE" "1024"
+	sudo systemctl stop dphys-swapfile
+	sudo systemctl start dphys-swapfile
+	#
+	# Modification du fichier fstab - montage du SSD externe
+	#
+	#modifier fstab pour ajouter
+	if [ $(grep -c "jeedom tmpfs" /etc/fstab) == 0 ]; then 
+		sudo sh -c 'echo "tmpfs /tmp/jeedom tmpfs defaults,noatime,nosuid,size=128m 0 0" >> /etc/fstab'
+	fi
+
+	#sdcard and SSD optimize
+	#journald
+	if [ $(grep -c 'Storage=volatile' /etc/systemd/journald.conf) == 0 ]; then
+		sudo sed -i '/^\[Journal\]/a\Storage=volatile\nRuntimeMaxUse=30M\n' /etc/systemd/journald.conf
+	fi
+
+	#reduce logging : create  /etc/rsyslog.d/jeedom.conf
+	sudo sh -c 'cat > /etc/rsyslog.d/jeedom.conf <<-EOF
+	:msg, contains, "www-data" stop
+	if \$programname == "sudo" and \$msg contains "session closed for user root" then stop
+	if \$programname == "sudo" and \$msg contains "session opened for user root" then stop
+	if \$programname == "CRON" and \$msg contains "jeeCron.php >> /dev/null" then stop
+	if \$programname == "CRON" and \$msg contains "No MTA" then stop
+	if \$programname == "CRON" and \$msg contains "watchdog" then stop
+	EOF'
+	#systemctl restart rsyslog
+	echo "${cyan}End optimization for ssd or sdcard${white}"
+}
+
 echo "${cyan}End basic and common configuration of this server${white}"
 
 install_jeedom () {
@@ -233,7 +312,6 @@ install_fing () {
 	sudo dpkg -i overlook-fing-3.0.deb
 	echo "${cyan}End installation fing${white}"
 }
-
 
 add_user_jeedom () {
 	useradd jeedom
@@ -530,6 +608,9 @@ security_iptables () {
 	-A INPUT -p udp -m udp --sport 5353 -j ACCEPT
 	-A OUTPUT -p udp -m udp --dport 5353 -j ACCEPT
 	
+	# Allow DHCP
+	-A INPUT - udp --sport 68 --dport 67 -j ACCEPT
+	
 	# Allow  squeezeboz server on port 3483
 	-A INPUT -p udp -m udp --dport 3483 -j ACCEPT
 	-A INPUT -p tcp -m tcp --dport 3483 -j ACCEPT
@@ -540,11 +621,15 @@ security_iptables () {
 	
 	#  Allow ping
 	-A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+
+	# Allow IGMP (multidiffusion)
+	-A INPUT -p igmp -j ACCEPT
 	
 	#  Log iptables denied calls
 	-A INPUT -m limit --limit 5/min -j LOG --log-prefix \"iptables denied: \" --log-level 7
 	
 	#  Drop all other inbound - default deny unless explicitly allowed policy
+	#  broadcast port 57621 : spotify connect peer to peer network : https://mrlithium.blogspot.com/2011/10/spotify-and-opting-out-of-spotify-peer.html
 	-A INPUT -j DROP
 	-A FORWARD -j DROP
 	
@@ -750,8 +835,6 @@ install_nginx () {
 	sudo apt-get -y install nginx
 	
 	security_iptables
-	
-	
 	
 	if [ ! -f /etc/nginx/dh4096.pem ]; then 
 		echo "${cyan}Create dh406.pem file, be patient more than 40 minutes ...${white}"
@@ -963,7 +1046,7 @@ install_vpn () {
 #sed -i.bak 's/^# Should-Stop:.*/# Should-Stop:/' /etc/init.d/logitechmediaserver
 #sudo systemctl start logitechmediaserver
 
-
+	
 #
 # Installation de rpi-clone
 #
@@ -996,11 +1079,15 @@ install_vpn () {
 #sudo systemctl start cron
 #sudo systemctl start nginx
 
-modules=$(echo ${role} | tr "+" " ")
+identify_system
+
+if [ -z ${modules} ]; then
+	modules=$(echo ${role} | tr "+" " ")
+fi
 echo "${cyan}List of modules to install on this server${white}"
 for module in ${modules}
 do
-    echo "Module=${cyan}\"${module}\"${white}"
+    echo "Module=${cyan}${module}${white}"
     echo "Check configuration of module ${cyan}${module}${white} on this server"
     case ${module} in
     dmz)
@@ -1016,7 +1103,8 @@ do
     	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
     	;;
     ebusd)
-    	install_ebus
+    	#install_ebus
+    	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
     	;;
     blea)
     	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
