@@ -9,10 +9,12 @@
 # Options:
 #  -h        ... help message
 #  -v        ... verbose
+#  -l        ... list : list modules
+#  -r        ... list : list routines
 #  -a        ... configure all the modules for this host
 #  -m module ... configure only this module
 #
-# Limitations: 
+# Limitations:
 #  . only one option should be given; a second one overrides
 #  . must be launched with user privilege that can do sudo command
 #
@@ -24,6 +26,8 @@
 verbose=0
 # defaults
 modules=""
+printRoutines=0
+printModules=0
 
 print_help () {
 	no_of_lines=`cat $0 | awk 'BEGIN { n = 0; } \
@@ -33,15 +37,19 @@ print_help () {
 	echo "`head -$no_of_lines $0`"
 }
 
-while getopts "hvam:w:" option ; do
+while getopts "hvlram:w:" option ; do
 	case ${option} in
 		h)	print_help
 			exit 0
 			;;
 		v)	verbose=1
 			;;
+		l)	printModules=1
+			;;
+		r)	printRoutines=1
+			;;
 		a)
-			;; 
+			;;
 		m)	modules=${OPTARG}
 			;;
 		\?)	echo "${red}Invalid option ${yellow}-${option}${white}"
@@ -59,7 +67,7 @@ if [ $# -lt 1 ]; then
 fi
 
 if [ ${verbose} -eq 1 ]; then
-	echo "$0 verbose activated" 
+	echo "$0 verbose activated"
 fi
 
 # Everything else needs to be run as root
@@ -82,12 +90,12 @@ echo "${cyan}Start configuration of this server${white}"
 #
 #  localisation
 #    locale => unset en_GB, set fr_FR.UTF8
-#       defaut local 
+#       defaut local
 #
 #  interfacing options => ssh
 #
-#                expand filesystem ensures that all of th sd card 
-#    
+#                expand filesystem ensures that all of th sd card
+#
 #
 # Automatisation de l'installation du serveur jeedom
 #
@@ -95,27 +103,20 @@ echo "${cyan}Start configuration of this server${white}"
 #call this function with 2 parameters : name of the file, text to add
 set_line () {
 	if [ $(grep -c "^${2@Q}" "$1") == 0 ]
-	then 
-	    sudo sh -c "echo ${2} >> ${1}"
+	then
+		sudo sh -c "echo ${2} >> ${1}"
 	fi
 }
 
 #call this function with 3 parameters : name of the file, name of the parameter and value
 set_parameter () {
 	if [ $(grep -c "^$2=" "$1") == 0 ]
-	then 
-	    sudo sh -c "echo $2=$3 >> $1"
-	else 
-	    sudo sed -i "s/^$2=.*/$2=$3/g" "$1"
+	then
+		sudo sh -c "echo $2=$3 >> $1"
+	else
+		sudo sed -i "s/^$2=.*/$2=$3/g" "$1"
 	fi
 }
-
-function_exists() {
-    declare -f -F $1 > /dev/null
-    return $?
-}
-
-function_exists function_name && echo Exists || echo No such function
 
 identify_system () {
 	echo "${cyan}Start identify this server${white}"
@@ -128,27 +129,33 @@ identify_system () {
 	case ${myIP} in
 	  ${jeedomSec_ip})
 		sudo sh -c "echo ${jeedomSec_name} > /etc/hostname";
-	  	CEC_OSD=${jeedomSec_name}
-	  	role=${jeedomSec_role};;
+		CEC_OSD=${jeedomSec_name}
+		role=${jeedomSec_role};;
 	  ${kodi_ip})
 		sudo sh -c "echo ${kodi_name} > /etc/hostname";
-	  	CEC_OSD=${kodi_name}
-	  	role=${kodi_role};;
+		CEC_OSD=${kodi_name}
+		role=${kodi_role};;
 	  ${jeedom_ip})
 		sudo sh -c "echo ${jeedom_name} > /etc/hostname";
-	  	CEC_OSD=${jeedom_name}
-	  	role=${jeedom_role};;
+		CEC_OSD=${jeedom_name}
+		role=${jeedom_role};;
 	  ${parent_ip})
 		sudo sh -c "echo ${parent_name} > /etc/hostname";
-	  	CEC_OSD=${parent_name}
-	  	role=${parent_role};;
+		CEC_OSD=${parent_name}
+		role=${parent_role};;
 	  *)
 		CEC_OSD="inconnu"
 		echo "${red}RPI unknown in configuration file, please add it : ${myIP}${white}";;
 	esac
 	echo "Name=${green}$(cat /etc/hostname)${white}"
 	echo "Role=${green}${role}${white}"
-	echo "${cyan}End identify this server${white}"	
+	echo "${cyan}End identify this server${white}"
+}
+
+install_test () {
+	echo "${cyan}Start installation test${white}"
+	echo "${green}test module does nothing...${white}"
+	echo "${cyan}End installation test${white}"
 }
 
 configure_localization () {
@@ -156,9 +163,9 @@ configure_localization () {
 	echo "${green}$(tr -d '\0' </proc/device-tree/model)${white}"
 	L='fr' && sudo sed -i 's/XKBLAYOUT=\"\w*"/XKBLAYOUT=\"'$L'\"/g' /etc/default/keyboard
 	#modify keyboard
-	
+
 	timedatectl set-timezone Europe/Paris
-	echo "${cyan}End localization this server${white}"	
+	echo "${cyan}End localization this server${white}"
 }
 
 
@@ -169,69 +176,75 @@ configure_system () {
 	  kodi) GPU_MEM="256";;
 	  *) GPU_MEM="16";;
 	esac
-	
+
 	case ${CEC_OSD} in
 	  kodi|parent) DTPARAM=AUDIO="on";;
 	  *) DTPARAM=AUDIO="off";;
 	esac
-	
+
 	case ${CEC_OSD} in
 	  parent) DTPARAM=act_led_trigger="none";;
 	  *) DTPARAM=act_led_trigger="heartbeat";;
 	esac
-	
+
 	#disable ipv6
 	file="/boot/cmdline.txt"
 	sudo sed -i "/ipv6/!s/$/ ipv6.disable=1/" ${file}
-	sudo sed -i "/ipv6.disable=0/ipv6.disable=1/" ${file}
-	
-	if [ $(grep -c "noipv6rs" /etc/dhcpcd.conf) == 0 ]; then 
-	    sudo sh -c 'echo "# disable ipv6 in /etc/dhcpcd.conf " >> /etc/dhcpcd.conf'
-	    sudo sh -c 'echo " " >> /etc/dhcpcd.conf'
+	sudo sed -i "s/ipv6.disable=0/ipv6.disable=1/" ${file}
+
+	if [ $(grep -c "noipv6rs" /etc/dhcpcd.conf) == 0 ]; then
+		sudo sh -c 'echo "# disable ipv6 in /etc/dhcpcd.conf " >> /etc/dhcpcd.conf'
+		sudo sh -c 'echo " " >> /etc/dhcpcd.conf'
 		sudo sh -c 'echo "noipv6rs" >> /etc/dhcpcd.conf'
 		sudo sh -c 'echo "noipv6" >> /etc/dhcpcd.conf'
 	fi
 	
-	
+	file="/etc/avahi/avahi-daemon.conf"
+	if [ $(grep -c "use-ipv6" ${file} ) == 0 ]; then
+		sudo sed -i '/^\[server\]/a\\nuse-ipv6=no' ${file}
+	else
+		sudo sed -i "s/use-ipv6=yes/use-ipv6=no/" ${file}
+	fi
+
 	set_line "/boot/config.txt" "#[jeedom]"
-	
+
 	#max memory for server (min for graphic..)
 	set_parameter "/boot/config.txt" "gpu_mem" ${GPU_MEM}
-	
+
 	#max de puissance sur les ports USB
 	set_parameter "/boot/config.txt" "max_usb_current" "1"
-	
+
 	#désactiver le wifi
 	set_parameter "/boot/config.txt" "dtoverlay" "pi-disable-wifi"
-	
+
 	sudo systemctl stop wpa_supplicant
 	sudo systemctl disable wpa_supplicant
-		
+
 	#désactiver le bluetooth interne si dongle externe
 	set_parameter "/boot/config.txt" "dtoverlay" "pi-disable-bt"
-	
+
 	#réduire la fréquence GPU pour être compatible RPI2 [rpi3 default = 400]
 	#sudo echo "gpu_freq=250" >> /boot/config.txt
-	
+
 	#nom sur la connexion hdmi-cec
 	set_parameter "/boot/config.txt" "cec_osd_name" ${CEC_OSD}
-	
+
 	#interdire l'affichage de ce pi sur l'écran télé à son démarrage
 	set_parameter "/boot/config.txt" "hdmi_ignore_cec_init" "1"
-	
+
 	# Enable audio (loads snd_bcm2835)
 	set_parameter "/boot/config.txt" "dtparam=audio" ${DTPARAM=AUDIO}
-	
-	
+
+
 	# Disable the ACT LED.
 	#dtparam=act_led_trigger=none
 	#dtparam=act_led_activelow=off
-	
+
 	# Disable the PWR LED.
 	#dtparam=pwr_led_trigger=none
 	#dtparam=pwr_led_activelow=off
-	
-	
+
+
 	#remove sap error
 	sudo sed -i 's|^ExecStart=/usr/lib/bluetooth/bluetoothd$|ExecStart=/usr/lib/bluetooth/bluetoothd --noplugin=sap|' /lib/systemd/system/bluetooth.service
 	echo "${cyan}End system configuration${white}"
@@ -253,7 +266,7 @@ upgrade_system () {
 optimize_drive () {
 	echo "${cyan}Start optimization for ssd or sdcard${white}"
 	#Optimisation du swap
-	
+
 	#echo "vm.swappiness = 10" >> /etc/sysctl.conf
 	set_parameter "/etc/sysctl.conf" "vm.swappiness" "10"
 
@@ -265,7 +278,7 @@ optimize_drive () {
 	# Modification du fichier fstab - montage du SSD externe
 	#
 	#modifier fstab pour ajouter
-	if [ $(grep -c "jeedom tmpfs" /etc/fstab) == 0 ]; then 
+	if [ $(grep -c "jeedom tmpfs" /etc/fstab) == 0 ]; then
 		sudo sh -c 'echo "tmpfs /tmp/jeedom tmpfs defaults,noatime,nosuid,size=128m 0 0" >> /etc/fstab'
 	fi
 
@@ -303,7 +316,7 @@ install_fing () {
 	mkdir fing
 	cd fing
 	sudo apt-get install libpcap-dev
-	#sudo apt-get install chkconfig	
+	#sudo apt-get install chkconfig
 	#https://www.fingbox.com/download?plat=[win|osx|lx32|lx64|arm]&ext=[rpm|deb|tgz|exe|dmg]
 	#rpi 1&2 => armhf : rpi 3&4 => arm64 ou arm...
 	wget https://www.fingbox.com/download?plat=arm&ext=deb
@@ -316,19 +329,19 @@ install_fing () {
 add_user_jeedom () {
 	useradd jeedom
 	passwd jeedom ${jeedom_password}
-	if [ $(sudo grep "jeedom" /etc/sudoers.d/* | wc -l) == 0 ]; then 
+	if [ $(sudo grep "jeedom" /etc/sudoers.d/* | wc -l) == 0 ]; then
 		sudo sh -c 'echo "jeedom ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/010_jeedom-nopasswd'
 	fi
 	sudo chown -R "jeedom"."jeedom" /home/jeedom
 }
 
 install_ssh () {
-	#installation de clés SSH 
+	#installation de clés SSH
 	#création de clé ssh pour le user www-data (soit jeedom) afin de pouvoir faire des actions sur d'autres serveurs en gardant comme user www-data
 	mkdir -p /var/www
 	mkdir -p /home/www-data/.ssh
 	chown -R www-data:www-data /home/www-data/ /var/www
-	
+
 	apt install -y expect
 	cat > ./login_jeedom.expect <<-EOF
 	#!/usr/bin/expect -f
@@ -339,18 +352,18 @@ install_ssh () {
 	expect eof
 	EOF
 	chmod a+x ./login_jeedom.expect
-		
+
 	sudo sed -i.bak 's/^www-data:x:33:33:www-data:\/var\/www:\/usr\/sbin\/nologin/www-data:x:33:33:www-data:\/var\/www:\/bin\/bash/' /etc/passwd
 	su - www-data
-	
+
 	#se mettre en tant que compte www-data  sudo su;su www-data ou sudo su - www-data
 	#s'assurer que la clé privée a comme nom id_rsa et non sshkey
-	
+
 	ssh-keygen -b 2048 -t rsa -f /home/www-data/.ssh/id_rsa -C www-data -q -N ""
-	
+
 	#ssh-copy-id -i /home/www-data/.ssh/id_rsa.pub jeedom@${kodi_ip}
-	
-	
+
+
 	/home/${default_user}/login_jeedom.expect ${parent_ip}
 	/home/${default_user}/login_jeedom.expect jeedom@${kodi_ip}
 	#ssh -i /home/www-data/.ssh/id_rsa jeedom@${kodi_ip}
@@ -374,50 +387,50 @@ install_ebus () {
 	./src/ebusd/ebusd --help
 	sudo make install
 	git clone https://github.com/john30/ebusd-configuration.git
-	
+
 	if [ -d /etc/ebusd ]; then sudo mv /etc/ebusd /etc/ebusd.old; fi
 	sudo ln -s ${PWD}/ebusd-configuration/ebusd-2.1.x/en /etc/ebusd
-	
+
 	if [ $(/usr/bin/ebusd  -c /etc/ebusd  --checkconfig | wc -l) != 3 ]; then
 		echo "${red}Error with standard ebusd configuration server${white}"
 		/usr/bin/ebusd  -c /etc/ebusd  --checkconfig
 		echo "${red}Exit installation ebus${white}"
 		return 20
 	fi
-	
+
 	git clone https://github.com/minscof/ebusd-configuration.git my-ebusd-configuration
-	
+
 	if [ $(grep -c "ecomode" /etc/ebusd/vaillant/_templates.csv) == 0 ]; then
 		echo "Modify ${yellow}_templates.csv${white}"
 		sudo sh -c 'echo "ecomode,UCH,0=eco;1=comfort0" >> /etc/ebusd/vaillant/_templates.csv'
 	fi
-	
+
 	if [ $(grep -c "0010015384" /etc/ebusd/vaillant/08.bai.csv) == 0 ]; then
 		echo "Modify ${yellow}08.bai.csv${white}"
 		sudo sed -i "/.*fallbacks.*/i\\[PROD='0010015384'\]\!load,bai\.0010015384\.inc,,," /etc/ebusd/vaillant/08.bai.csv
 		#cp my-ebusd-configuration/ebusd-2.1.x/en/vaillant/08.bai.csv ebusd-configuration/ebusd-2.1.x/en/vaillant/08.bai.csv
 	fi
-	
+
 	if [ ! -f /etc/ebusd/vaillant/15.e7c.csv ]; then
 		echo "Add ${yellow}15.e7c.csv${white}"
 		sudo cp my-ebusd-configuration/ebusd-2.1.x/en/vaillant/15.e7c.csv /etc/ebusd/vaillant/15.e7c.csv
 	fi
-	
+
 	if [ ! -f /etc/ebusd/vaillant/bai.0010015384.inc ]; then
 		echo "Add ${yellow}bai.0010015384.inc${white}"
 		sudo cp my-ebusd-configuration/ebusd-2.1.x/en/vaillant/bai.0010015384.inc /etc/ebusd/vaillant/bai.0010015384.inc
 	fi
-	
+
 	if [ $(/usr/bin/ebusd  -c /etc/ebusd  --checkconfig | wc -l) != 3 ]; then
 		echo "${red}Error with personalized ebusd configuration server${white}"
 		/usr/bin/ebusd  -c /etc/ebusd  --checkconfig
 		echo "${red}Exit installation ebus${white}"
 		return 21
 	fi
-	
-	
+
+
 	sudo sed -i "s#^EBUSD_OPTS.*#EBUSD_OPTS=\x27-d ${ebus_ip}:9999 -l /dev/null -c /etc/ebusd --scanconfig --latency=20000 --mqttport=1883 --mqttjson --accesslevel=\"*\" \x27#" /etc/default/ebusd
-	
+
 	sudo apt-get -y install mosquitto mosquitto-clients
 	echo "${cyan}Start mosquitto server${white}"
 	sudo systemctl restart mosquitto
@@ -432,7 +445,7 @@ install_ebus () {
 install_audioBT () {
 	echo "${cyan}Start configuration bluetooth audio${white}"
 	#Bluetooth section
-	
+
 	#pour transformer le rpi en récepteur audio bluetooth
 	#https://gist.github.com/mill1000/74c7473ee3b4a5b13f6325e9994ff84c
 	# s'assurer que le user est bien dans le groupe bluetooth
@@ -453,12 +466,12 @@ install_audioBT () {
 	scan off
 	trust yy:yy:yy:yy:yy:yy
 	pair yy:yy:yy:yy:yy:yy
-	\[agent\] Confirm passkey xxxxxx \(yes/no\): yes et du côté de l'équipement valider aussi ce code		
-	mettre l'ampli en mode input auto et non coax, pour tester la carte son usb	
+	\[agent\] Confirm passkey xxxxxx \(yes/no\): yes et du côté de l'équipement valider aussi ce code
+	mettre l'ampli en mode input auto et non coax, pour tester la carte son usb
 	aplay -D hw:CARD=Device piano2.wav
 	echo "${cyan}End configuration bluetooth audio${white}"
 }
- 
+
 install_sshpass () {
 	#sshpass pour script manageopenelec
 	sudo apt-get install sshpass
@@ -473,8 +486,8 @@ install_sshpass () {
 
 install_cec () {
 	echo "${cyan}Start installation hdmiCec${white}"
-	#cec-client	
-	sudo apt-get install libraspberrypi-dev 
+	#cec-client
+	sudo apt-get install libraspberrypi-dev
 	sudo apt-get install cmake liblockdev1-dev libudev-dev libxrandr-dev python-dev swig
 	cd
 	git clone https://github.com/Pulse-Eight/platform.git
@@ -491,7 +504,7 @@ install_cec () {
 	make -j4
 	sudo make install
 	sudo ldconfig
-		
+
 	cd ~
 	mkdir cecHdmi
 	cd cecHdmi
@@ -501,9 +514,9 @@ install_cec () {
 	chmod a+x *
 	chown root.root monitorHDMI
 	mv monitorHDMI /etc/init.d/
-	update-rc.d monitorHDMI defaults 
-	echo "${cyan}End installation hdmiCec${white}"  	
-}		
+	update-rc.d monitorHDMI defaults
+	echo "${cyan}End installation hdmiCec${white}" 
+}
 
 install_kodi () {
 	echo "${cyan}Start installation kodi${white}"
@@ -514,10 +527,10 @@ install_kodi () {
 	sudo apt-get -y install autofs
 	if [ -f /etc/auto.master ]; then
 		if [ $(grep -c ${USER} /etc/auto.master) == 0 ]; then
-			sudo sh -c "echo \"/home/${USER}/video /etc/auto.nfs --ghost,--timeout=60\" >> /etc/auto.master"
+			sudo sh -c "echo \"/home/${USER}/videos /etc/auto.nfs --ghost,--timeout=60\" >> /etc/auto.master"
 		fi
 	else
-		sudo sh -c "echo \"/home/${USER}/video /etc/auto.nfs --ghost,--timeout=60\" >> /etc/auto.master"
+		sudo sh -c "echo \"/home/${USER}/videos /etc/auto.nfs --ghost,--timeout=60\" >> /etc/auto.master"
 	fi
 	#sudo sh -c "echo \"${nas_name}      -rsize=8192,wsize=8292,timeo=14,intr,rw,uid=1000,gid=1000    ${nas_ip}:${nas_volume}\"  >> /etc/auto.nfs"
 	sudo sh -c "echo \"${nas_name} -fstype=nfs,rw   ${nas_ip}:${nas_volume}\"  >> /etc/auto.nfs"
@@ -537,6 +550,7 @@ migrate_defaultUser2secureUser () {
 	usermod --login ${secure_user} --move-home --home /home/${secure_user} ${default_user}
 	groupmod --new-name ${secure_user} ${default_user}
 	${default_user}=${secure_user}
+	sudo usermod -a -G bluetooth ${default_user}
 }
 
 install_mysensor () {
@@ -555,7 +569,7 @@ install_mysensor () {
 	cd RF24-master
 	make all
 	sudo make install
-	
+
 	cd ~/mysensors
 	wget https://github.com/mysensors/Raspberry/archive/master.zip
 	unzip master.zip
@@ -577,75 +591,87 @@ security_iptables () {
 	*filter
 
 	#  Allow all loopback (lo0) traffic and drop all traffic to 127/8 that doesn t use lo0
-	-A INPUT -i lo -j ACCEPT
-	-A INPUT -d 127.0.0.0/8 -j REJECT
-	
+	-A INPUT -i lo -j ACCEPT -m comment --comment \"allow loopback traffic lo\"
+	-A INPUT -d 127.0.0.0/8 -j REJECT -m comment --comment \"drop all traffic to 127/8 that doesn t use lo\"
+
 	#  Accept all established inbound connections
-	-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-	
+	-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT -m comment --comment \"established inbound connections\"
+
 	#  Allow all outbound traffic - you can modify this to only allow certain traffic
-	-A OUTPUT -j ACCEPT
-	
+	-A OUTPUT -j ACCEPT -m comment --comment \"all outbound traffic\"
+
 	#  Allow HTTP and HTTPS connections from anywhere (the normal ports for websites and SSL).
-	-A INPUT -p tcp --dport 80 -j ACCEPT
-	-A INPUT -p tcp --dport 443 -j ACCEPT
-	
+	-A INPUT -p tcp --dport 80 -j ACCEPT -m comment --comment \"web server\"
+	-A INPUT -p tcp --dport 443 -j ACCEPT  -m comment --comment \"web server TLS\"
+
 	# Allow  HTTP on port 8080 only from jeedom for kodi & kodiasgui plugin
-	-A INPUT -s ${lan_network}/24 -p tcp --dport 8080 -j ACCEPT
-	
+	-A INPUT -s ${lan_network}/24 -p tcp --dport 8080 -j ACCEPT -m comment --comment \"kodi\"
+
 	# Allow  HTTP on port 8003 only from find (wifi geolocation)
-	-A INPUT -s ${lan_network}/24 -p tcp --dport 8003 -j ACCEPT
-	
+	-A INPUT -s ${lan_network}/24 -p tcp --dport 8003 -j ACCEPT  -m comment --comment \"wigi geolocation find 8003\"
+
 	# Allow  MQTT on port 1883 only from jeedom for ebusd
-	-A INPUT -s ${lan_network}/24 -p tcp --dport 1883 -j ACCEPT
-	
+	-A INPUT -s ${lan_network}/24 -p tcp --dport 1883 -j ACCEPT -m comment --comment \"MQTT 1883\"
+
 	#  Allow SSH connections
 	#  The -dport number should be the same port number you set in sshd_config
 	#-A INPUT -p tcp -m state --state NEW --dport 22 -j ACCEPT
-	-A INPUT -s ${lan_network}/24 -p tcp -m state --state NEW --dport 22 -j ACCEPT
+	-A INPUT -s ${lan_network}/24 -p tcp -m state --state NEW --dport 22 -j ACCEPT -m comment --comment \"ssh\"
+
+	#blea antenna
+	-A INPUT -s ${lan_network}/24 -p tcp -m tcp --dport 55008 -m comment --comment \"BLEA remote\" -j ACCEPT
+
+	#usbip redirection
+	-A INPUT -s ${lan_network}/24 -p tcp -m tcp --dport 3240 -m comment --comment \"USB redirection\" -j ACCEPT
 
 	# Allow  mDNS on port 5353
-	-A INPUT -p udp -m udp --sport 5353 -j ACCEPT
-	-A OUTPUT -p udp -m udp --dport 5353 -j ACCEPT
-	
+	-A INPUT -p udp -m udp --sport 5353 -j ACCEPT -m comment --comment \"mDNS 5353\"
+	-A OUTPUT -p udp -m udp --dport 5353 -j ACCEPT -m comment --comment \"mDNS 5353\"
+
 	# Allow DHCP
-	-A INPUT - udp --sport 68 --dport 67 -j ACCEPT
-	
+	-A INPUT - udp --sport 68 --dport 67 -j ACCEPT -m comment --comment \"dhcp 68 & 67\"
+
 	# Allow  squeezeboz server on port 3483
-	-A INPUT -p udp -m udp --dport 3483 -j ACCEPT
-	-A INPUT -p tcp -m tcp --dport 3483 -j ACCEPT
-	-A INPUT -s ${lan_network}/24 -m udp --dport 17784 -j ACCEPT
-	
+	-A INPUT -p udp -m udp --dport 3483 -j ACCEPT -m comment --comment \"squeezebox server\"
+	-A INPUT -p tcp -m tcp --dport 3483 -j ACCEPT -m comment --comment \"squeezebox server\"
+	-A INPUT -s ${lan_network}/24 -m udp --dport 17784 -j ACCEPT -m comment --comment \"squeezebox server\"
+
 	# drop dropbox sync and add comment to remove log
 	-A INPUT -p udp --dport 17500 -j DROP -m comment --comment \"dropbox lan\"
-	
+
 	#  Allow ping
-	-A INPUT -p icmp --icmp-type echo-request -j ACCEPT
+	-A INPUT -p icmp --icmp-type echo-request -j ACCEPT -m comment --comment \"icmp ping\"
 
 	# Allow IGMP (multidiffusion)
-	-A INPUT -p igmp -j ACCEPT
+	-A INPUT -p igmp -j ACCEPT -m comment --comment \"igmp multidiffusion\"
 	
+	# Allow spotify peer to peer
+	#-A TCP -p tcp --dport 57621 -j ACCEPT -m comment --comment spotify
+	-A UDP -p udp --dport 57621 -j ACCEPT -m comment --comment spotify
+
 	#  Log iptables denied calls
 	-A INPUT -m limit --limit 5/min -j LOG --log-prefix \"iptables denied: \" --log-level 7
-	
+
 	#  Drop all other inbound - default deny unless explicitly allowed policy
 	#  broadcast port 57621 : spotify connect peer to peer network : https://mrlithium.blogspot.com/2011/10/spotify-and-opting-out-of-spotify-peer.html
 	-A INPUT -j DROP
 	-A FORWARD -j DROP
-	
+
 	COMMIT
 	EOF"
-	
+
 	#add file for logging iptables
 	sudo sh -c 'cat > /etc/rsyslog.d/iptables.conf <<-EOF
 	:msg, contains, "iptables" -/var/log/iptables.log
-	&~
+	&stop
 	EOF'
-	
+
 	echo "${cyan}Activate iptables rules${white}"
 	sudo /sbin/iptables-restore < /etc/iptables.firewall.rules
+	sudo apt -y install iptables-persistent
+	sudo iptables-save >/etc/iptables/rules.v4
 	sudo sh -c "echo \"#!/bin/sh\" > /etc/network/if-pre-up.d/firewall"
-	sudo sh -c "echo \"/sbin/iptables-restore < /etc/iptables.firewall.rules\" >> /etc/network/if-pre-up.d/firewall"
+	sudo sh -c "echo \"/sbin/iptables-restore < /etc/iptables/rules.v4" >> /etc/network/if-pre-up.d/firewall"
 	echo "${cyan}End configuration iptables${white}"
 }
 
@@ -653,19 +679,19 @@ security_fail2ban () {
 	echo "${cyan}Start installation fail2ban${white}"
 	sudo apt-get -y install fail2ban
 	sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
-	
+
 	#sshd
 	if [ $(grep -c 'filter = sshd' /etc/fail2ban/jail.local) == 0 ]; then
 		sudo sed -i '/^\[sshd\]/a\enabled = true\nfilter = sshd\nbanaction = iptables-multiport\nbantime = -1\nmaxretry = 3\n' /etc/fail2ban/jail.local
 	fi
-	
+
 	#nginx
 	if [ $(grep -c 'filter = nginx-badbots' /etc/fail2ban/jail.local) == 0 ]; then
 		sudo sh -c 'echo /\[ssh\]/a\enabled = true >> /etc/fail2ban/jail.local'
 	fi
-	
+
 	sudo sh -c 'cat > /etc/fail2ban/jail.local <<-EOF
-		
+
 	[nginx-badbots]
 
 	enabled  = true
@@ -674,11 +700,11 @@ security_fail2ban () {
 	logpath  = /var/log/nginx/jeedom.access.log
 	maxretry = 2
 	EOF'
-	
+
 	sudo cp /etc/fail2ban/filter.d/apache-badbots.conf /etc/fail2ban/filter.d/nginx-badbots.conf
-	
+
 	sudo systemctl restart fail2ban
-	
+
 	echo "${cyan}End installation fail2ban${white}"
 }
 
@@ -688,125 +714,125 @@ security_nginx () {
 	#!/bin/sh
 	saveTo=/etc/nginx/deny
 	now=$(date);
-	
+
 	#echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/dshield-deny.conf
 	#wget -O - http://feeds.dshield.org/block.txt | awk '/^[0-9]/ { print "deny " $1 "/24; # comment=DShield"}' >> $saveTo/dshield-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/spamhaus-deny.conf
 	wget -O - http://www.spamhaus.org/drop/drop.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=SpamHaus"}' >> $saveTo/spamhaus-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/spamhaus2-deny.conf
 	wget -O - http://www.spamhaus.org/drop/edrop.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=edrop"}' >> $saveTo/spamhaus2-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/malc0de-deny.conf
 	wget -O - http://malc0de.com/bl/IP_Blacklist.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=malc0de"}' >> $saveTo/malc0de-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/myipms-deny.conf
 	wget -O - https://myip.ms/files/blacklist/general/latest_blacklist.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=myipms"}' >> $saveTo/myipms-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/blocklist-deny.conf
 	wget -O - https://lists.blocklist.de/lists/all.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=blocklist"}' >> $saveTo/blocklist-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/zeustracker-deny.conf
 	wget -O - https://zeustracker.abuse.ch/blocklist.php?download=ipblocklist | awk '/^[0-9]/ { print "deny " $1 "; # comment=zeustracker"}' >> $saveTo/zeustracker-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/ransomwaretracker-deny.conf
 	wget -O - http://ransomwaretracker.abuse.ch/downloads/RW_IPBL.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=ransomwaretracker"}' >> $saveTo/ransomwaretracker-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/TeslaCrypt-deny.conf
 	wget -O - http://ransomwaretracker.abuse.ch/downloads/TC_PS_IPBL.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=TeslaCrypt"}' >> $saveTo/TeslaCrypt-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/CryptoWall-deny.conf
 	wget -O - http://ransomwaretracker.abuse.ch/downloads/CW_PS_IPBL.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=CryptoWall"}' >> $saveTo/CryptoWall-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/Locky-deny.conf
 	wget -O - http://ransomwaretracker.abuse.ch/downloads/LY_C2_IPBL.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=Locky"}' >> $saveTo/Locky-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/Locky2-deny.conf
 	wget -O - http://ransomwaretracker.abuse.ch/downloads/LY_PS_IPBL.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=Locky2"}' >> $saveTo/Locky2-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/TorrentLockerC2-deny.conf
 	wget -O - http://ransomwaretracker.abuse.ch/downloads/TL_C2_IPBL.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=TorrentLockerC2"}' >> $saveTo/TorrentLockerC2-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/TorrentLocker-deny.conf
 	wget -O - http://ransomwaretracker.abuse.ch/downloads/TL_PS_IPBL.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=TorrentLocker"}' >> $saveTo/TorrentLocker-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/Aattack30d-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/atlas_attacks_30d.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=Aattack30d"}' >> $saveTo/Aattack30d-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/Abotnets30d-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/atlas_botnets_30d.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=Abotnets30d"}' >> $saveTo/Abotnets30d-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/Afastflux30d-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/atlas_fastflux_30d.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=Afastflux30d"}' >> $saveTo/Afastflux30d-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/Aphishing30d-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/atlas_phishing_30d.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=Aphishing30d"}' >> $saveTo/Aphishing30d-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/Ascans30d-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/atlas_scans_30d.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=Ascans30d"}' >> $saveTo/Ascans30d-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/Biany230d-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/bi_any_2_30d.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=Biany230d"}' >> $saveTo/Biany230d-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/ciarmy-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/ciarmy.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=ciarmy"}' >> $saveTo/ciarmy-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/asproxc2-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/asprox_c2.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=asproxc2"}' >> $saveTo/asproxc2-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/cleanmxviruses-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/cleanmx_viruses.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=cleanmxviruses"}' >> $saveTo/cleanmxviruses-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/cleanmxphishing-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/cleanmx_phishing.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=cleanmxphishing"}' >> $saveTo/cleanmxphishing-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/iwspamlist-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/iw_spamlist.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=iwspamlist"}' >> $saveTo/iwspamlist-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/ipmasterlist-deny.conf
 	wget -O - http://osint.bambenekconsulting.com/feeds/c2-ipmasterlist.txt | awk '/^[0-9]/ { print "deny " $1 ";"}' | awk -F "," '{gsub("IP"," ",$1);print $1"; # comment=ipmasterlist"}' >> $saveTo/ipmasterlist-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/cybercrime-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/cybercrime.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=cybercrime"}' >> $saveTo/cybercrime-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/stopforumspam30d-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/stopforumspam_30d.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=stopforumspam30d"}' >> $saveTo/stopforumspam30d-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/torexits30d-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/tor_exits_30d.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=torexits30d"}' >> $saveTo/torexits30d-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/fireholanon-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_anonymous.netset | awk '/^[0-9]/ { print "deny " $1 "; # comment=fireholanon"}' >> $saveTo/fireholanon-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/firehol_level1-deny.conf
 	wget -O - https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset | awk '/^[0-9]/ { print "deny " $1 "; # comment=firehol_level1"}' >> $saveTo/firehol_level1-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/normshield-deny.conf
 	wget -O - https://iplists.firehol.org/files/normshield_all_wannacry.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=normshield"}' >> $saveTo/normshield-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/php_spammers_30d-deny.conf
 	wget -O - https://iplists.firehol.org/files/php_spammers_30d.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=php_spammers_30d"}' >> $saveTo/php_spammers_30d-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/yakakliker-deny.conf
 	wget -O - http://www.yakakliker.org/@api/deki/files/1451/=yakakliker.txt | awk '/^[0-9]/ { print "deny " $1 "; # comment=yakakliker"}' >> $saveTo/yakakliker-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/malwaredomainlist-deny.conf
 	wget -O - http://www.malwaredomainlist.com/hostslist/ip.txt | awk '/^[0-9]/ sub("\r$", "") { print "deny " $1 "; # comment=malwaredomainlist"}' >> $saveTo/malwaredomainlist-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org for NGINX" `date` > $saveTo/darklist_de-deny.conf
 	wget -O - https://iplists.firehol.org/files/darklist_de.netset | awk '/^[0-9]/ { print "deny " $1 "; # comment=darklist_de"}' >> $saveTo/darklist_de-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org" `date` > $saveTo/cybercrime-deny.conf
 	wget -O - https://iplists.firehol.org/files/cybercrime.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=cybercrime"}' >> $saveTo/cybercrime-deny.conf
-	
+
 	echo "# Generated by Yakakliker.org" `date` > $saveTo/tor-deny.conf
 	wget -O - https://iplists.firehol.org/files/tor_exits_30d.ipset | awk '/^[0-9]/ { print "deny " $1 "; # comment=tor"}' >> $saveTo/tor-deny.conf
 	EOF
-	
+
 	chmod uga+x /home/${secure_user}/getblacklist.sh
 	sudo mkdir -p /etc/nginx/deny
-	
+
 	#nginx add allow
 	if [ $(grep -c "allow ${lan_network}" /etc/nginx/nginx.conf) == 0 ]; then
 		sudo sed -i "/sites-enabled/i\\tallow ${lan_network}/24;" /etc/nginx/nginx.conf
@@ -833,87 +859,87 @@ install_nginx () {
 	sudo sed -i '/.*::.*/ d' /etc/nginx/sites-available/default
 	#install again
 	sudo apt-get -y install nginx
-	
+
 	security_iptables
-	
-	if [ ! -f /etc/nginx/dh4096.pem ]; then 
+
+	if [ ! -f /etc/nginx/dh4096.pem ]; then
 		echo "${cyan}Create dh406.pem file, be patient more than 40 minutes ...${white}"
 		cd /etc/nginx
 		sudo openssl dhparam -out dh4096.pem 4096
 		cd ~
 	fi
-	
+
 	echo "${cyan}Get letsencrypt certificat${white}"
 	sudo apt-get -y install certbot
 	if [ ! -f /etc/letsencrypt/live/${webserver_name}/fullchain.pem ]; then
 		sudo systemctl stop nginx
 		sudo certbot certonly --standalone -d ${webserver_name}
 	fi
-	
+
 	sudo sh -c 'cat > /etc/nginx/perfect-forward-secrecy.conf <<-EOF
 	##
 	# SSL Settings
 	##
-	
+
 	ssl_protocols TLSv1.2 TLSv1.3; # Dropping SSLv3, TLSv1 TLSv1.1 ref: POODLE
 	ssl_prefer_server_ciphers on;
 	ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384;
 	ssl_dhparam dh4096.pem;
 	EOF'
-	
+
 	sudo mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.ori
 	#configure nginx
 	sudo sh -c 'cat > /etc/nginx/nginx.conf <<-EOF
 	user www-data;
 	worker_processes 2;
 	pid /run/nginx.pid;
-	
+
 	events {
 	        worker_connections 768;
 	        # multi_accept on;
 	}
-	
+
 	http {
-	
+
 	        ##
 	        # Basic Settings
 	        ##
-	
+
 	        sendfile on;
 	        tcp_nopush on;
 	        tcp_nodelay on;
 	        #keepalive_timeout 65;
 	        types_hash_max_size 2048;
 	        server_tokens off;
-	
+
 	        server_names_hash_bucket_size 64;
 	        # server_name_in_redirect off;
-	
+
 	        include /etc/nginx/mime.types;
 	        default_type application/octet-stream;
-	
+
 	        ##
 	        # Logging Settings
 	        ##
-	
+
 	        gzip on;
 	        gzip_disable "msie6";
-	
+
 	        # gzip_vary on;
 	        # gzip_proxied any;
 	        # gzip_comp_level 6;
 	        # gzip_buffers 16 8k;
 	        # gzip_http_version 1.1;
 	        # gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
-	
+
 	        ##
 	        # Virtual Host Configs
 	        ##
-	
+
 	        include /etc/nginx/conf.d/*.conf;
 	        include /etc/nginx/sites-enabled/*;
 	        include /etc/nginx/perfect-forward-secrecy.conf;
-	
+
 	        ##
 	        # Harden nginx against DDOS
 	        ##
@@ -923,7 +949,7 @@ install_nginx () {
 	        keepalive_timeout     10 10;
 	        send_timeout          10;
 	}
-	EOF'	
+	EOF'
 
 
 	#configure as reverse-proxy
@@ -989,12 +1015,63 @@ install_nginx () {
 }
 
 install_vpn () {
-	echo "${cyan}Start installation openvpn${white}"
-	echo "${red}...to be developped...${white}"
-	echo "${cyan}End installation openvpn${white}"
+	echo "${cyan}Start installation pivpn${white}"
+	echo "${green}use Wireguard, please...${white}"
+	curl -L https://install.pivpn.io | bash
+	echo "${cyan}End installation pivpn${white}"
 }
 
 
+install_desktop () {
+	echo "${cyan}Start installation graphical environnement (desktop)${white}"
+	echo "${green}Start minimal xorg...${white}"
+	sudo apt-get -y install --no-install-recommends xserver-xorg
+	#add startx instead of session manager like lightdm
+	sudo apt-get -y install --no-install-recommends xinit
+	echo "${green}Start minimal desktop lxde...${white}"
+	sudo apt-get install lxde-core
+	
+	file="/etc/lightdm/lightdm.conf"
+	if [ $(grep -c ${secure_user} ${file}) == 0 ]; then
+		#[SeatDefaults] add
+		sudo sed -i "s/^s#autologin-user=/autologin-user=${secure_user}/"  ${file}
+		sudo sed -i "s/^s#autologin-user-timeout=/autologin-user-timeout=0/"  ${file}
+		sudo sed -i "s/^s#autologin-session=/autologin-session=openbox/"  ${file}
+		sudo sed -i "s/^s#pam-autologin-service=/pam-service=lightdm-autologin/"  ${file}
+	fi
+	#start console mode at boot
+	sudo systemctl set-default multi-user
+	
+	echo "${cyan}End installation graphical environnement (desktop)${white}"
+}
+
+
+configure_rdp () {
+	sudo apt-get install -y freerdp2-x11
+	sudo nano /usr/share/applications/Rdp.desktop
+[Desktop Entry]
+Type=Application
+Name=RDP
+Comment=Terminal Windows
+Exec=/usr/bin/xfreerdp /microphone:sys:alsa /sound:sys:alsa /usb:id,dev:043e:3007 /clipboard /size:70% /u:Thierry /network:lan /v:192.168.0.33
+Terminal=false
+Categories=Development;
+}
+
+configure_webcam () {
+	#créer le fichier /etc/udev/rules.d/51-webcam-permissions.rules avec le contenu
+	file="/etc/udev/rules.d/51-webcam-permissions.rules"
+	sudo sh -c "echo 'SUBSYSTEM==\"usb\", ENV{DEVTYPE}==\"usb_device\",ATTR{idVendor}==\"043e\" , ATTR{idProduct}==\"3007\", MODE=\"0666\"' >> ${file}"
+	sudo sh -c "echo 'SUBSYSTEM==\"usb\", ENV{DEVTYPE}==\"usb_device\",ATTR{idVendor}==\"043e\" , ATTR{idProduct}==\"3008\", MODE=\"0666\"' >> ${file}"
+
+}
+
+
+install_usb_redirection () {
+	sudo apt-get -y install usbip
+	sudo sh -c "modprobe usbip-core; modprobe usbip-host"
+	sudo sh -c "usbipd -D"
+}
 #
 # Installation de samba
 #
@@ -1046,7 +1123,7 @@ install_vpn () {
 #sed -i.bak 's/^# Should-Stop:.*/# Should-Stop:/' /etc/init.d/logitechmediaserver
 #sudo systemctl start logitechmediaserver
 
-	
+
 #
 # Installation de rpi-clone
 #
@@ -1056,7 +1133,7 @@ install_vpn () {
 #cd rpi-clone
 #sudo cp rpi-clone /usr/local/sbin
 
-#sudo systemctl stop logitechmediaserver	
+#sudo systemctl stop logitechmediaserver
 #sudo systemctl stop nginx
 #sudo systemctl stop jeedom
 #sudo systemctl stop php5-fpm
@@ -1066,7 +1143,7 @@ install_vpn () {
 #sudo systemctl stop nmbd
 
 #sudo umount /dev/sda2
-#sudo apt-get install dosfstools	
+#sudo apt-get install dosfstools
 #sudo rpi-clone sdb -f
 
 #sudo mount -a
@@ -1079,40 +1156,80 @@ install_vpn () {
 #sudo systemctl start cron
 #sudo systemctl start nginx
 
+print_routines () {
+	routines=$(declare -f -F | awk '{print $3}')
+	echo $routines
+}
+
+print_modules () {
+	modules=$(declare -f -F | awk '{print $3}' | awk '{split($0,a,"_"); print a[2]}')
+	echo $modules
+}
+
+
+if [ ${printModules} == 1 ]; then
+	print_modules
+	exit 0
+fi
+
+if [ ${printRoutines} == 1 ]; then
+	print_routines
+	exit 0
+fi
+
 identify_system
 
-if [ -z ${modules} ]; then
+if [ -z "${modules}" ]; then
 	modules=$(echo ${role} | tr "+" " ")
 fi
 echo "${cyan}List of modules to install on this server${white}"
 for module in ${modules}
 do
-    echo "Module=${cyan}${module}${white}"
-    echo "Check configuration of module ${cyan}${module}${white} on this server"
-    case ${module} in
-    dmz)
-    	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
-    	;;
-    vpn)
-    	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
-    	;;
-    kodi)
-    	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
-    	;;
-    mqtt)
-    	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
-    	;;
-    ebusd)
-    	#install_ebus
-    	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
-    	;;
-    blea)
-    	echo "Module ${yellow}${module} already configured on this server, skip...${white}"
-    	;;
-    *)
-   	    echo "Module ${red}${module} is unknown, skip...${white}"
-   	    ;;
-    esac
+	echo "Module=${cyan}${module}${white}"
+	routines=$(declare -f -F | awk -v var=${module} '$0~var {print $3}')
+	if [ -z "${routines}" ]; then
+		echo "Module ${yellow}${module}${red} is not yet immplemented or not found, skip...${white}"
+		exit 1
+	else
+		echo "Module ${yellow}${module}${cyan} is associated to routines ${yellow}${routines}${white}"
+	fi
+	for routine in ${routines}
+	do
+		echo "Check configuration of routine ${cyan}${routine}${white} on this server"
+		case ${module} in
+		dmz)
+			echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
+			;;
+		vpn)
+			echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
+			${routine}
+			;;
+		nginx)
+			echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
+			#${routine}
+			;;
+		kodi)
+			echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
+			;;
+		mqtt)
+			echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
+			;;
+		ebusd)
+			#install_ebus
+			echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
+			;;
+		blea)
+			echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
+			;;
+		desktop)
+			#echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
+			${routine}
+			;;
+		*)
+			echo "Routine ${red}${routine} is unknown, skip...${white}"
+			;;
+		esac
+	done
 done
 
 
