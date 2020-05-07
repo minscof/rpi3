@@ -14,5 +14,7 @@ from the console
 - tmp/modify_user.sh
 - tmp/modify_iptables.sh
 - tmp/add_video2fstab.sh
+- sudo apt-get install nginx
+- sudo apt-get install certbot
 
 

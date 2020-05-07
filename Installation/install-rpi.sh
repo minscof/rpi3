@@ -618,11 +618,14 @@ security_iptables () {
 	#-A INPUT -p tcp -m state --state NEW --dport 22 -j ACCEPT
 	-A INPUT -s ${lan_network}/24 -p tcp -m state --state NEW --dport 22 -j ACCEPT -m comment --comment \"ssh\"
 
-	#blea antenna
+	# Allow  blea antenna
 	-A INPUT -s ${lan_network}/24 -p tcp -m tcp --dport 55008 -m comment --comment \"BLEA remote\" -j ACCEPT
 
 	#usbip redirection
 	-A INPUT -s ${lan_network}/24 -p tcp -m tcp --dport 3240 -m comment --comment \"USB redirection\" -j ACCEPT
+	
+	# Allow  pulseaudio on port 4713 only for LAN
+	-A INPUT -s ${lan_network}/24 -p tcp -m tcp --dport 4713 -m comment --comment \"pulseaudio\" -j ACCEPT
 
 	# Allow  mDNS on port 5353
 	-A INPUT -p udp -m udp --sport 5353 -j ACCEPT -m comment --comment \"mDNS 5353\"
@@ -647,8 +650,17 @@ security_iptables () {
 	
 	# Allow spotify peer to peer
 	#-A TCP -p tcp --dport 57621 -j ACCEPT -m comment --comment spotify
-	-A UDP -p udp --dport 57621 -j ACCEPT -m comment --comment spotify
-
+	-A INPUT -p udp --dport 57621 -j ACCEPT -m comment --comment spotify
+	
+	# Allow USB redirector
+	-A INPUT -p tcp -m tcp --dport 32032 -j ACCEPT -m comment --comment \"USB redirector\"
+	
+	
+	# Discard without logging
+	# netbios broadcast
+	-A INPUT -s ${lan_network}/24 -p udp -m udp --sport=137 --dport=137 -m comment --comment netbios -j DROP
+    -A INPUT -s ${lan_network}/24 -p udp -m udp --sport=138 --dport=138 -m comment --comment netbios -j DROP
+    
 	#  Log iptables denied calls
 	-A INPUT -m limit --limit 5/min -j LOG --log-prefix \"iptables denied: \" --log-level 7
 
