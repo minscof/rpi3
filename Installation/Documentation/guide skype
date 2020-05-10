@@ -7,4 +7,4 @@ installer skypeforlinux
 ajouter le user utilisé au groupe video, pour qu'il puisse avoir accès aux devices /dev/video (ou modifier les urules pour ajouter les droits
 
 sudo usermod -a -G group username
-sudo usermod -a -G video thierry
+sudo usermod -a -G video john

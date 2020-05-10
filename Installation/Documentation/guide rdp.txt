@@ -28,7 +28,7 @@ Sur Xubuntu, la partie de la ligne de commande permettant d’exécuter le clien
 => on peut utiliser policyplus au lieu de gpedit
 https://lecrabeinfo.net/policy-plus-activer-gpedit-msc-editeur-strategie-groupe-locale-sur-windows-famille.html
 
-C:\Users\Thierry\Downloads\RDPWrap-v1.6.2>RDPWInst.exe -r
+C:\Users\john\Downloads\RDPWrap-v1.6.2>RDPWInst.exe -r
 RDP Wrapper Library v1.6.2
 Installer v2.5
 Copyright (C) Stas'M Corp. 2017

@@ -66,13 +66,13 @@ then
          USB REDIRECTOR - incentive pro 
  ____________________________________
                    ************* CLIENT *************
- pour mars (client)
+ pour violin (client)
  https://www.incentivespro.com/usb-redirector-linux-x86_64.tar.gz
  
  sudo ./installer.sh install-client
  usbclnt -addserver 192.168.0.30:32032
  usbclnt -l
- thierry@mars:~/usb-redirector-linux-x86_64$ usbclnt -l
+ john@violin:~/usb-redirector-linux-x86_64$ usbclnt -l
 
 ================= USB CLIENT OPERATION SUCCESSFUL ===============
 List of USB servers and devices:
@@ -94,7 +94,7 @@ List of USB servers and devices:
  -> créer des règles udev pour donner des droits à /dev/video0 et /dev/video1 sinon chmod 666 ...
  
                    ************* SERVEUR *************
- pour kodi [rpi] (server)
+ pour server
  sudo ./installer.sh install-server
  usbsrv -list
  hermes@kodi:/etc/pulse $ usbsrv -list

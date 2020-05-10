@@ -476,7 +476,7 @@ install_mysensor () {
 #sauvegarde dropbox plus pertinente
 # quid du projet https://github.com/andreafabrizi/Dropbox-Uploader pour supprimer les vieilles sauvegardes sur dropbox ?
 #sudo mount -a
-#sudo cp /home/jeedom/music/_thierry/prefs.tgz .
+#sudo cp /home/jeedom/music/_john/prefs.tgz .
 #sudo tar -xvgz prefs.tgz
 #sudo chown -R squeezeboxserver.nogroup prefs
 #sudo rm prefs.tgz

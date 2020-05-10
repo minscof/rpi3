@@ -1,5 +1,5 @@
 sudo adduser jeedom
-#installation de clés SSH : ex pour gérer à distance mars (user jeedom, ip = 192.168.0.15)
+#installation de clés SSH : ex pour gérer à distance (user jeedom, ip = 192.168.0.15)
 ssh-keygen -t rsa
 (enter pour ne pas créer de passphrase)
 

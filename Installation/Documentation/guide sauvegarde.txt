@@ -1,6 +1,6 @@
 Sauvegarde en réseau local
 
-Serveur de sauveagarde mars
+Serveur de sauvegarde
 Logiciel utilisé : urbackup
 
 sauvegarde incrémentielle

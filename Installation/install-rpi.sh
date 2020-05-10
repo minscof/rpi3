@@ -467,7 +467,7 @@ install_audioBT () {
 	trust yy:yy:yy:yy:yy:yy
 	pair yy:yy:yy:yy:yy:yy
 	\[agent\] Confirm passkey xxxxxx \(yes/no\): yes et du côté de l'équipement valider aussi ce code
-	mettre l'ampli en mode input auto et non coax, pour tester la carte son usb
+	#mettre l'ampli en mode input auto et non coax, pour tester la carte son usb
 	aplay -D hw:CARD=Device piano2.wav
 	echo "${cyan}End configuration bluetooth audio${white}"
 }
