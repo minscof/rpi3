@@ -1,0 +1,22 @@
+How to problème mysql
+
+1. Vérifier l'existence du fichier DB_backup.sql à la racine de jeedom (/usr/share/nginx/www/jeedom)
+2. Désinstaller mysqlserver
+sudo apt-get remove mysql-server
+sudo apt-get remove mysql-server-5.5
+3. Supprimer les fichiers corrompus
+sudo rm -rf /var/lib/mysql/*
+4. Installer mysqlserver
+sudo apt-get install mysql-server
+5. ReDonner le mot de passe Mjeedom96 à root
+6. Se connecter à mysql
+mysql -u root -p Mjeedom96
+7. récupérer le mot de passe mysql du user jeedom dans core/config/common.config.php
+8.
+ CREATE USER 'jeedom'@'localhost' IDENTIFIED BY '${MYSQL_JEEDOM_PASSWD}'
+ CREATE DATABASE jeedom;
+ GRANT ALL PRIVILEGES ON jeedom.* TO 'jeedom'@'localhost';
+ 
+ 9 ajouter la commande USE jeedom; dans le fichier DB_backup.sql
+ 10 faire la restauration 
+ mysql -u jeedom -p < DB_backup.sql 

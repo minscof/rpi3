@@ -1,0 +1,32 @@
+Comment lance t on le serveur ?
+
+
+lorsqu'un autre appareil se connecte, cela fait tomber l'appli... : manque de robustesse
+
+
+MQTT: Connected with result code 0
+('on', 1, u'3C:A3:08:C2:1D:ED')
+BLE instruction:
+7b03010001
+Connecting 3C:A3:08:C2:1D:ED...
+Wait 1 seconds...
+BLE instruction send...
+('on', 1, u'3C:A3:08:C2:1D:ED')
+BLE instruction:
+7b03010001
+Connecting 3C:A3:08:C2:1D:ED...
+Exception in thread Thread-1:
+Traceback (most recent call last):
+  File "/usr/lib/python2.7/threading.py", line 801, in __bootstrap_inner
+    self.run()
+  File "/usr/lib/python2.7/threading.py", line 754, in run
+    self.__target(*self.__args, **self.__kwargs)
+  File "./aqualin-mqtt-deamon.py", line 105, in runworkerbledevicestate
+    setblerequest(queuevalues[0], queuevalues[2], bleHandle, getblevalue(queuevalues[0], queuevalues[1]))
+  File "./aqualin-mqtt-deamon.py", line 88, in setblerequest
+    device = btle.Peripheral(str(devicemac))
+  File "/usr/local/lib/python2.7/dist-packages/bluepy/btle.py", line 353, in __init__
+    self._connect(deviceAddr, addrType, iface)
+  File "/usr/local/lib/python2.7/dist-packages/bluepy/btle.py", line 402, in _connect
+    "Failed to connect to peripheral %s, addr type: %s" % (addr, addrType))
+BTLEException: Failed to connect to peripheral 3C:A3:08:C2:1D:ED, addr type: public

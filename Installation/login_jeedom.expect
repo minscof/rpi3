@@ -1,0 +1,6 @@
+#!/usr/bin/expect -f
+#send jeedom password
+spawn ssh-copy-id -i /home/www-data/.ssh/id_rsa $argv
+expect "password:"
+send "lRiQDTYF\n"
+expect eof

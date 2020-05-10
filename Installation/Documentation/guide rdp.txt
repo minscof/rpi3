@@ -1,0 +1,335 @@
+
+Partie Windows
+activer rdp sur windows home famille (réservé windows pro en principe)
+https://www.itechtics.com/remote-desktop-windows-10-home/
+=> a priori le listener n'est pas actif avec le fichier .ini fourni par défaut
+=> modifier le fichier ini avec celui fourni par l'incident https://github.com/stascorp/rdpwrap/issues/1022
+=> réenregistrer le  wrapper : RDPWInst -r
+Adresse IP de windows : 192.168.0.33
+
+
+
+Pour que le micro et la vidéo distante soit propagée vers windows, il faut l'autoriser au nivau de windwos
+
+Ouvrez l'invite de commande (cmd.exe) en tant qu'administrateur.
+Tapez "gpedit" (sans les guillemets) et appuyez sur Entrée.
+Accédez à Configuration ordinateur - > Modèles d'administration - > les fenêtres Composants - > Services de bureau à distance - > Session de bureau à distance Hôte - > Redirection du périphérique et des ressources.
+Double-cliquez sur "Autoriser la redirection de lecture audio et vidéo".
+Sélectionnez "Activé", tapez "Oui" (sans les guillemets) dans le texte du commentaire. boîte. Cliquez sur Appliquer
+
+Computer Configuration -> Administratives Templates -> Windows Components -> Remote Desktop Services -> Remote Desktop Session Host -> Device and Resource Redirection
+« do not allow supported Plug and Play device redirection » -> DISABLED
+.
+Cliquez sur "Paramètre suivant".
+Assurez-vous que c'est "Autoriser la redirection d'enregistrement audio" et faites de même. Cliquez sur OK.
+Fermez la session (non seulement votre session de bureau à distance, mais votre session en cours) et reconnectez-vous, en vous assurant que "Apporter l’audio à cette ordinateur "est sélectionné dans les options de votre bureau à distance
+Sur Xubuntu, la partie de la ligne de commande permettant d’exécuter le client (FreeRDP version 2.0.0-dev): xfreerdp / sound: sys: alsa / microphone: sys: alsa
+
+=> on peut utiliser policyplus au lieu de gpedit
+https://lecrabeinfo.net/policy-plus-activer-gpedit-msc-editeur-strategie-groupe-locale-sur-windows-famille.html
+
+C:\Users\Thierry\Downloads\RDPWrap-v1.6.2>RDPWInst.exe -r
+RDP Wrapper Library v1.6.2
+Installer v2.5
+Copyright (C) Stas'M Corp. 2017
+
+[*] Restarting...
+[+] TermService found (pid 13536).
+[*] No shared services found.
+[*] Terminating service...
+[*] Starting TermService...
+[-] StartService error (code 1056).
+[+] Done.
+
+Partie Linux/rpi
+-> installation light de x11 : xorg, rpd (pixel), lxde, lightdm
+https://www.raspberrypi.org/forums/viewtopic.php?t=133691
+
+
+
+https://edutechwiki.unige.ch/fr/Installation_de_Raspbian
+
+Comme serveur graphique : Xorg
+Comme environnement de bureau : Lxde (Pixel) voire openbox...
+Comme gestionnaire de fenêtres : Openbox
+Comme gestionnaire de session : sans-> xinit (startx) (Lightdm)
+
+=> l'installation de lxde-core dans l'option no-recommended install aussi pulseaaudio ...
+=> sur openbox : https://doc.ubuntu-fr.org/openbox
+
+-> installation de freeRDP
+-> lancement en ligne de commande via xfreeRDP /v:192.168.0.33 /dvc:urbdrc,dev:<vid>:<pid> /sound:sys:alsa /microphone:sys:alsa
+
+
+IL FAUT que le micro et la webcam soient des équipements usb différents !!!!!!!
+-> https://github.com/FreeRDP/FreeRDP/issues/6024
+
+
+lsusb pour obtenir vid et pid vendor id et product id
+il faut donner les droits sur le périphérique usb
+créer le fichier /etc/udev/rules.d/51-webcam-permissions.rules avec le contenu
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device",SYSFS{idVendor}=="043e" , SYSFS{idProduct}=="3007", MODE="0666"
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device",SYSFS{idVendor}=="043e" , SYSFS{idProduct}=="3008", MODE="0666"
+
+
+autologin du user hermes - environnement graphique LXDE
+(pour connaitre les environnements graphiques disponibles : ls /usr/share/xsessions)
+nano /etc/lightdm/lightdm.conf
+[SeatDefaults]
+autologin-user=hermes
+autologin-user-timeout=0
+#autologin-session=LXDE|openbox
+pam-autologin-service=lightdm-autologin
+
+Ajouter une entrée de menu 
+sudo nano /usr/share/applications/Rdp.desktop
+[Desktop Entry]
+Type=Application
+Name=RDP
+Comment=Terminal Windows
+Exec=/usr/bin/xfreerdp /microphone:sys:alsa /sound:sys:alsa /usb:id,dev:043e:3007 /cert-ignore /clipboard /size:70% /u:Thierry /network:lan /v:192.168.0.33
+Terminal=false
+Categories=Development;
+
+xfreerdp /v:10.0.5.31 /u:usbtest /d:development /size:90% /usb:id,dev:04f2:b451 /sound:sys:pulse /cert-ignore /multimedia:sys:pulse /echo /network:lan /gfx:AVC444 /disp +clipboard /bpp:32 /nsc /microphone:sys:pulse
+
+xfreerdp /microphone:sys:alsa /sound:sys:alsa /usb:id,dev:043e:3007 /clipboard /size:70% /cert-ignore /u:Thierry /network:lan /v:192.168.0.33
+
+
+
+debug xfreerdp
+WLOG_LEVEL=DEBUG WLOG_APPENDER=file WLOG_FILEAPPENDER_OUTPUT_FILE_NAME=freerdp.log WLOG_FILEAPPENDER_OUTPUT_FILE_PATH=/tmp /usr/bin/xfreerdp
+
+
+caractéristique webcam logitech
+ID 043e:3007   => camera AN-VC300
+ID 043e:3008   => microphone AN-VC300
+
+Cartes son alsa
+- (default)
+0 bcm2835 ALSA
+1 AN-VC300
+
+
+tester la sortie hdmi
+eventuellement compiler avant
+/opt/vc/src/hello_pi/hello_audio/hello_audio.bin 1
+tester la sortie ligne
+/opt/vc/src/hello_pi/hello_audio/hello_audio.bin
+
+[mauvais conseil hdmi_drive=2 in the /boot/config.txt file => totalement inutile..]
+il faut créer un fichier .asoundrc dans le répertoire de l'utilisateur et indiquer la carte pour le contrôle
+on peut aussi créer le fichier /etc/asound.conf
+pcm.!default {
+    type hw
+    card 0
+}
+ctl.!default {
+    type hw
+    card 0
+}
+
+puis il faut indiquer qu'on veut sur cette carte (0) la sortie hdmi
+amixer cset numid=3 2
+(amixer cset numid=3 1 => analog)
+
+wget https://file-examples.com/wp-content/uploads/2017/11/file_example_WAV_1MG.wav
+aplay file_example_WAV_1MG.wav
+
+sound over network for skype
+https://medium.com/@mathieu.requillart/my-ultimate-guide-to-the-raspberry-pi-audio-server-i-wanted-pulseaudio-tcp-cbaa5cb966e6
+http://pila.fr/wordpress/?p=1303
+http://cyfta.com/how-to-record-a-nice-sounding-podcast-over-skype-using-linux/
+
+
+=> system ou default : préférer default (sous l'identité du user, plutôt que system
+At Pulseaudio server /etc/pulse/default.pa
+load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1;192.168.0.0/24
+
+il faut impérativement ajouter tsched=0 pour améliorer les performances
+load-module module-udev-detect tsched=0
+
+At Pulseaudio client, /etc/pulse/default.pa
+load-module module-tunnel-sink server=192.168.0.15:4713
+load-module module-tunnel-source server=192.168.0.15:4713
+
+=> possibilité d'indiquer dans le fichier /etc/pulse/client.conf, l'adresse du serveur pulseaudio distant, soit celui du rpi...
+default-server= 192.168.0.30
+
+Troubleshooting
+
+tester le son
+aplay /usr/share/sounds/alsa/Front_Center.wav
+aplay ~/Musique/file_example_WAV_1MG.wav
+
+
+sur rpi
+/opt/vc/src/hello_pi/hello_audio/hello_audio.bin 1
+
+vérifier que les haut parleurs du rpi sont atteignables
+depuis mars, lancer vlc, aller dans audio/périphérique audio, il doit y avoir 2 périphériques : interne et hermes..
+
+
+#réinitialiser pulseaudio
+rm -r ~/.config/pulse /tmp/pulse-*
+pulseaudio --kill
+pulseaudio --start
+rm -r ~/.config/pulse /tmp/pulse-*
+
+
+
+le module esound n'est plus installé avec les versions récentes, pour autant, il semble que paprefs le référence : cela induit des erreurs qui ne sont pas graves, mais qu'on ne peut pas supprimer..
+paprefs conserve son paramétrage dans gsettings
+org.freedesktop.pulseaudio.module-groups /org/freedesktop/pulseaudio/module-groups/
+ex
+gsettings get org.freedesktop.pulseaudio.module-group:/org/freedesktop/pulseaudio/module-groups/ name
+
+hermes@kodi:~ $ gsettings list-children org.freedesktop.pulseaudio.module-groups
+upnp-media-server   org.freedesktop.pulseaudio.module-group:/org/freedesktop/pulseaudio/module-groups/upnp-media-server/
+rtp-send            org.freedesktop.pulseaudio.module-group:/org/freedesktop/pulseaudio/module-groups/rtp-send/
+zeroconf-discover   org.freedesktop.pulseaudio.module-group:/org/freedesktop/pulseaudio/module-groups/zeroconf-discover/
+rtp-recv            org.freedesktop.pulseaudio.module-group:/org/freedesktop/pulseaudio/module-groups/rtp-recv/
+combine             org.freedesktop.pulseaudio.module-group:/org/freedesktop/pulseaudio/module-groups/combine/
+remote-access       org.freedesktop.pulseaudio.module-group:/org/freedesktop/pulseaudio/module-groups/remote-access/
+raop-discover       org.freedesktop.pulseaudio.module-group:/org/freedesktop/pulseaudio/module-groups/raop-discover/
+
+
+gsettings list-recursively org.freedesktop.pulseaudio.module-groups
+
+hermes@kodi:~ $ gsettings list-recursively org.freedesktop.pulseaudio.module-group:/org/freedesktop/pulseaudio/module-groups/remote-access/
+org.freedesktop.pulseaudio.module-group args0 'auth-anonymous=1'
+org.freedesktop.pulseaudio.module-group args1 'auth-anonymous=1'
+org.freedesktop.pulseaudio.module-group args2 ''
+org.freedesktop.pulseaudio.module-group args3 ''
+org.freedesktop.pulseaudio.module-group args4 ''
+org.freedesktop.pulseaudio.module-group args5 ''
+org.freedesktop.pulseaudio.module-group args6 ''
+org.freedesktop.pulseaudio.module-group args7 ''
+org.freedesktop.pulseaudio.module-group args8 ''
+org.freedesktop.pulseaudio.module-group args9 ''
+org.freedesktop.pulseaudio.module-group locked false
+org.freedesktop.pulseaudio.module-group name ''
+org.freedesktop.pulseaudio.module-group name0 'module-native-protocol-tcp'
+org.freedesktop.pulseaudio.module-group name1 'module-esound-protocol-tcp'
+org.freedesktop.pulseaudio.module-group name2 'module-zeroconf-publish'
+org.freedesktop.pulseaudio.module-group name3 ''
+org.freedesktop.pulseaudio.module-group name4 ''
+org.freedesktop.pulseaudio.module-group name5 ''
+org.freedesktop.pulseaudio.module-group name6 ''
+org.freedesktop.pulseaudio.module-group name7 ''
+org.freedesktop.pulseaudio.module-group name8 ''
+org.freedesktop.pulseaudio.module-group name9 ''
+org.freedesktop.pulseaudio.module-group enabled true
+
+
+pour supprimer le parametrage d'esound qui n'existe plus : écraser la valeur de name1, args1 et name2
+gsettings set org.freedesktop.pulseaudio.module-group:/org/freedesktop/pulseaudio/module-groups/remote-access/ name1 module-zeroconf-publish
+gsettings set org.freedesktop.pulseaudio.module-group:/org/freedesktop/pulseaudio/module-groups/remote-access/ args1 ''
+gsettings set org.freedesktop.pulseaudio.module-group:/org/freedesktop/pulseaudio/module-groups/remote-access/ name2 ''
+
+
+
+carte son rpi
+
+hermes@kodi:~/Musique $ cat /proc/asound/cards
+ 0 [ALSA           ]: bcm2835_alsa - bcm2835 ALSA
+                      bcm2835 ALSA
+ 1 [ANVC300        ]: USB-Audio - AN-VC300
+                      LGE AN-VC300 at usb-3f980000.usb-1.2.1, full speed
+
+hermes@kodi:~/Musique $ cat /proc/asound/pcm
+00-00: bcm2835 ALSA : bcm2835 ALSA : playback 7
+00-01: bcm2835 IEC958/HDMI : bcm2835 IEC958/HDMI : playback 1
+00-02: bcm2835 IEC958/HDMI1 : bcm2835 IEC958/HDMI1 : playback 1
+01-00: USB Audio : USB Audio : capture 1
+
+
+aplay -l
+
+carte 0: ALSA [bcm2835 ALSA], périphérique 0: bcm2835 ALSA [bcm2835 ALSA]
+  Sous-périphériques: 7/7
+  Sous-périphérique #0: subdevice #0
+  Sous-périphérique #1: subdevice #1
+  Sous-périphérique #2: subdevice #2
+  Sous-périphérique #3: subdevice #3
+  Sous-périphérique #4: subdevice #4
+  Sous-périphérique #5: subdevice #5
+  Sous-périphérique #6: subdevice #6
+carte 0: ALSA [bcm2835 ALSA], périphérique 1: bcm2835 IEC958/HDMI [bcm2835 IEC958/HDMI]
+  Sous-périphériques: 1/1
+  Sous-périphérique #0: subdevice #0
+carte 0: ALSA [bcm2835 ALSA], périphérique 2: bcm2835 IEC958/HDMI1 [bcm2835 IEC958/HDMI1]
+  Sous-périphériques: 1/1
+  Sous-périphérique #0: subdevice #0
+
+Les 7 sous-périphériques correspondent à la capacité matérielle de la carte à accepter 7 flux dfférents et à les mixer vers la sortie unique
+
+
+
+
+pi@raspberrypi:~ $ aplay -l
+**** List of PLAYBACK Hardware Devices ****
+card 0: ALSA [bcm2835 ALSA], device 0: bcm2835 ALSA [bcm2835 ALSA]
+  Subdevices: 7/7
+  Subdevice #0: subdevice #0
+  Subdevice #1: subdevice #1
+  Subdevice #2: subdevice #2
+  Subdevice #3: subdevice #3
+  Subdevice #4: subdevice #4
+  Subdevice #5: subdevice #5
+  Subdevice #6: subdevice #6
+card 0: ALSA [bcm2835 ALSA], device 1: bcm2835 ALSA [bcm2835 IEC958/HDMI]
+
+
+
+Pulseaudio : voir ce guide : https://wiki.archlinux.org/index.php/PulseAudio/Examples
+
+lister les différents output (sink) - l'* indique le défaut 
+pacmd list-sinks | grep -e 'name:' -e 'index:'
+hermes@kodi:/etc/pulse $ pacmd list-sinks | grep -e 'name:' -e 'index:'
+  * index: 0
+        name: <alsa_output.platform-soc_audio.analog-mono>
+    index: 2
+        name: <tunnel.mars.local.alsa_output.pci-0000_00_08.0.analog-stereo>
+        
+        
+        
+     
+********** cette commande permet de recréer le "tunnel" avec kodi pour diffuser la musique        
+pactl load-module module-tunnel-sink "server=192.168.0.30 sink=alsa_output.platform-soc_audio.analog-mono sink_name=skype"
+
+** cette commande permt ensuite de choisir cette sortie son comme défaut
+pacmd set-default-sink skype
+
+sur le client (mars), pour redécouvrir le serveur pulseaudio distant :
+sudo service avahi-daemon restart
+sudo systemctl restart avahi-daemon
+
+
+
+
+lister les différents input (sources) - l'* indique le défaut 
+pacmd list-sources | grep -e 'name:' -e 'index:'
+
+choisir une source par défaut : préciser l'index ou le nom
+pacmd set-default-source 2
+
+arecord -l
+hermes@kodi:~ $ arecord -l
+**** Liste des Périphériques Matériels CAPTURE ****
+carte 1: ANVC300 [AN-VC300], périphérique 0: USB Audio [USB Audio]
+  Sous-périphériques: 0/1
+  Sous-périphérique #0: subdevice #0
+
+
+pour tester le micro
+arecord -f S16_LE -d 10 -c 2 -r 16000 --device="hw:1,0" /tmp/test-mic.wav
+puis
+aplay /tmp/test-mic.wav
+
+
+
+choisir le stream PCM : ici pulse
+arecord -f S16_LE -d 10 -c 2 -r 16000 -D pulse /tmp/test-mic.wav
+laisser la source par défaut
+arecord -f S16_LE -d 10 -c 2 -r 16000  /tmp/test-mic.wav

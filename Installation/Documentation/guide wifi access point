@@ -1,0 +1,16 @@
+Tuto pour installer un point d'accès wifi avec vpn pour permettre aux équipements echo d'écouter la musique de Pandora et iheartradio
+
+https://www.geekzone.fr/2018/11/05/transformez-votre-raspberry-pi-en-point-dacces-wifi-avec-raspap/
+ou
+https://www.framboise314.fr/raspap-creez-votre-hotspot-wifi-avec-un-raspberry-pi-de-facon-express/
+
+est basé sur le logiciel raspap : https://github.com/billz/raspap-webgui
+
+
+
+Utilisation du vpn windscribe (60 G/mos)
+https://windscribe.com/guides/linux#how-to
+
+windscribe login
+windscribe connect Empire    : pour se connecter sur un serveur à new york
+windscribe connections

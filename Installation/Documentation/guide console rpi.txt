@@ -1,0 +1,39 @@
+Gérer la résolution de l'écran
+
+https://www.raspberrypi.org/forums/viewtopic.php?f=91&t=162837
+
+connaitre les modes supportés par l'écran
+tvservice -m CEA
+tvservice -m DMT
+
+
+hermes@kodi:~ $ tvservice -m CEA
+Group CEA has 12 modes:
+           mode 1: 640x480 @ 60Hz 4:3, clock:25MHz progressive
+           mode 2: 720x480 @ 60Hz 4:3, clock:27MHz progressive
+           mode 3: 720x480 @ 60Hz 16:9, clock:27MHz progressive
+           mode 4: 1280x720 @ 60Hz 16:9, clock:74MHz progressive
+           mode 5: 1920x1080 @ 60Hz 16:9, clock:74MHz interlaced
+  (prefer) mode 16: 1920x1080 @ 60Hz 16:9, clock:148MHz progressive
+           mode 17: 720x576 @ 50Hz 4:3, clock:27MHz progressive
+           mode 18: 720x576 @ 50Hz 16:9, clock:27MHz progressive
+           mode 19: 1280x720 @ 50Hz 16:9, clock:74MHz progressive
+           mode 20: 1920x1080 @ 50Hz 16:9, clock:74MHz interlaced
+           mode 31: 1920x1080 @ 50Hz 16:9, clock:148MHz progressive
+           mode 32: 1920x1080 @ 24Hz 16:9, clock:74MHz progressive
+           
+hermes@kodi:~ $ tvservice -m DMT
+Group DMT has 1 modes:
+           mode 4: 640x480 @ 60Hz 4:3, clock:25MHz progressive
+
+
+
+
+#!/bin/sh
+tvservice -e "CEA 16"
+sleep 1
+fbset -depth 8
+fbset -depth 16
+fbset -g 1920 1080 1920 1080 16
+ou
+fbset -g 1024 600 1024 600 16

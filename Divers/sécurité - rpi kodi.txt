@@ -1,0 +1,15 @@
+80.82.77.234
+avril 16 17:55:23 kodi kernel: iptables denied: IN=eth0 OUT= MAC=b8:27:eb:f6:db:32:e4:5d:51:32:6b:78:08:00:45:00:00:28:ac:cb:00:00:f7:06:b8:01 SRC=80.82.77.234 D
+-> IPV NETBLOCK - NL - Seychelles...
+
+92.118.37.88
+avril 16 18:08:35 kodi kernel: iptables denied: IN=eth0 OUT= MAC=b8:27:eb:f6:db:32:e4:5d:51:32:6b:78:08:00:45:00:00:28:2d:88:00:00:f7:06:53:b3 SRC=92.118.37.88 D
+->  International Hosting Company - Kirovskaya obl., Oparino, ul. Tsiynelya, 34
+
+83.97.20.186
+avril 16 18:09:12 kodi kernel: iptables denied: IN=eth0 OUT= MAC=b8:27:eb:f6:db:32:e4:5d:51:32:6b:78:08:00:45:00:00:28:dd:5b:00:00:f4:06:c0:92 SRC=83.97.20.186 D
+-> OvO-Systems-RO -  Suite 9, Ansuya Estate, Revolution Avenue, Mahe, Seychelles
+
+185.176.27.2
+avril 16 18:12:24 kodi kernel: iptables denied: IN=eth0 OUT= MAC=b8:27:eb:f6:db:32:e4:5d:51:32:6b:78:08:00:45:00:00:28:7b:a2:00:00:f5:06:b4:b4 SRC=185.176.27.2 D
+-> IP Dunaev Yuriy Vyacheslavovich - 420132, Kazan, Chuikova str, 69

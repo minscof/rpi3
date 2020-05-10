@@ -1,0 +1,36 @@
+#Jeedom server
+#proxy vers 192.168.0.57 à la racine
+upstream backend {
+		server 192.168.0.57:80;
+		server 192.168.0.9:80;
+}
+
+
+server {
+        listen 80;
+        server_name matepioditi.ddns.net;
+        access_log /var/log/nginx/jeedom.access.log;
+        error_log /var/log/nginx/jeedom.error.log;
+        location / {
+                proxy_pass      http://192.168.0.57/;
+        }
+}
+
+
+server {
+        listen 443 ssl http2;
+        server_name matepioditi.ddns.net;
+
+
+        ssl_certificate /etc/letsencrypt/live/matepioditi.ddns.net/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/matepioditi.ddns.net/privkey.pem;
+        access_log /var/log/nginx/jeedom.access.log;
+        error_log /var/log/nginx/jeedom.error.log;
+        location / {
+                proxy_pass      http://backend;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+}

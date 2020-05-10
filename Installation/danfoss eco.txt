@@ -1,0 +1,31 @@
+Installation d'une tête danfoss eco bluetooth
+utilisation de ce projet python
+https://github.com/AdamStrojek/libetrv
+
+installation d'un environnement virtuel python
+récupération de l'adreese mac de la tête : 00:04:2F:60:3A:54
+récupération de la clé secrète via la commande, il faut appuyer sur le bouton de la tête pour obtenir la clé
+
+source ~/venv/libetrv/bin/activate
+python3 -m libetrv.cli device 00:04:2F:60:3A:54 retrive_key
+
+ modification du code pour enregistrer statiquement la clé obtenue, fichier cli.py
+ 
+ class CLI:
+    def __init__(self, pin=b'0000', secret="d7f78ffb04ae471079080e2c72ce321c"):
+ 
+ 
+ modifier le code de cli pour supprimer le symbole des degrés ° qui fait planter l'affichage
+ 
+ récupérer la température
+ source ~/venv/libetrv/bin/activate
+ sudo su
+ cd /home/pi/libetrv
+ python3 -m libetrv.cli device 00:04:2F:60:3A:54 temperature
+ 
+ 
+ ------------------
+ remarques
+ cela semble fonctionner alors que blea tourne, mais éventuellement arrêter blea
+ il faut être en root, mais on peut essayer de donner des droits via  
+ 

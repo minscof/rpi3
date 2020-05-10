@@ -1,0 +1,37 @@
+Sauvegarde en réseau local
+
+Serveur de sauveagarde mars
+Logiciel utilisé : urbackup
+
+sauvegarde incrémentielle
+
+Connexion à l'interface d'admin web
+http://192.168.0.15:55414/
+
+
+
+
+
+Installation
+
+Serveur
+
+
+Clients
+
+
+
+
+
+Ports utilisés
+
+Server:
+55413 FastCGI
+55414 HTTP
+55415 Internet clients
+35623 UDB broadcasts (sending)
+
+Client:
+35622 UDP broadcasts (receiving)
+35623 Commands/Image backups
+35621 File backups

@@ -1,0 +1,2 @@
+qemu-system-arm.exe -kernel kernel-qemu-4.1.7-jessie -cpu arm1176 -m 256 -M versatilepb -no-reboot -serial stdio -append "root=/dev/sda2 panic=1 rootfstype=ext4 rw" -hda img-mini-rpi-1.212.img
+#qemu-system-arm.exe -kernel kernel-qemu-4.1.7-jessie -cpu arm1176 -m 256 -M versatilepb -no-reboot -serial stdio -append "root=/dev/sda2 panic=1 rootfstype=ext4 rw" -hda img-mini-rpi-1.212.img -netdev user,id=mynet0,net=192.168.0.0/24,dhcpstart=192.168.0.90

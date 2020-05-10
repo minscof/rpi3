@@ -1,0 +1,144 @@
+le projet usb/ip
+
+projet usb/ip ou usbip est intégré dans debian : il est dans le kernel de linux depuis 2011
+
+sudo apt-get install usbip
+ou sudo apt install linux-tools-common /* ubuntu
+
+#run daemon server to share
+sudo modprobe usbip-core
+sudo modprobe usbip-host
+#sudo usbipd -4 -d
+sudo usbipd -4 -D
+
+# display local usb device
+sudo usbip list -l
+
+hermes@kodi:~ $ sudo usbip list -l
+ - busid 1-1.1 (0424:ec00)
+   Standard Microsystems Corp. : SMSC9512/9514 Fast Ethernet Adapter (0424:ec00)
+
+ - busid 1-1.2 (0ac8:3450)
+   Z-Star Microelectronics Corp. : unknown product (0ac8:3450)
+
+ - busid 1-1.3 (1231:805a)
+   unknown vendor : unknown product (1231:805a)
+
+ - busid 1-1.4 (0a12:0001)
+   Cambridge Silicon Radio, Ltd : Bluetooth Dongle (HCI mode) (0a12:0001)
+
+ - busid 1-1.5 (04f2:0939)
+   Chicony Electronics Co., Ltd : unknown product (04f2:0939)
+
+#share usb webcam  Z-Star Microelectronics Corp. : unknown product (0ac8:3450)
+sudo usbip bind --busid=1-1.2
+
+#stop share la webcam  Z-Star Microelectronics Corp. : unknown product (0ac8:3450)
+sudo usbip unbind --busid=1-1.2
+> usbip: info: bind device on busid 1-1.2: complete
+
+
+
+---------------------
+Windows
+
+install 
+-> https://github.com/cezanne/usbip-win
+
+
+with powershell
+ .\usbip.exe list -r 192.168.0.30
+ usbip: error: failed to open usb id database
+Exportable USB devices
+======================
+ - 192.168.0.30
+      1-1.2: unknown vendor : unknown product (0ac8:3450)
+           : /sys/devices/platform/soc/3f980000.usb/usb1/1-1/1-1.2
+           : unknown class / unknown subclass / unknown protocol (ef/02/01)
+           
+then
+.\usbip.exe --debug attach -r 192.168.0.30 -b 1-1.2
+
+
+ 
+ 
+--------------------------------------------------------------
+         USB REDIRECTOR - incentive pro 
+ ____________________________________
+                   ************* CLIENT *************
+ pour mars (client)
+ https://www.incentivespro.com/usb-redirector-linux-x86_64.tar.gz
+ 
+ sudo ./installer.sh install-client
+ usbclnt -addserver 192.168.0.30:32032
+ usbclnt -l
+ thierry@mars:~/usb-redirector-linux-x86_64$ usbclnt -l
+
+================= USB CLIENT OPERATION SUCCESSFUL ===============
+List of USB servers and devices:
+
+   1: USB server at 192.168.0.30:32032
+      Mode: manual-connect   Status: connected
+   |
+   `-   6: AN-VC300 Camera LGE Composite USB Device
+           Vid: 043e   Pid: 3007   Port: 1-1.2.4
+           Mode: manual-connect   Status: available for connection
+===================== ======================= ===================
+ 
+ usbclnt -connect 1-6
+ 
+ usbclnt -connect 1-3
+ 
+ usbclnt -disconnect 
+ 
+ -> créer des règles udev pour donner des droits à /dev/video0 et /dev/video1 sinon chmod 666 ...
+ 
+                   ************* SERVEUR *************
+ pour kodi [rpi] (server)
+ sudo ./installer.sh install-server
+ usbsrv -list
+ hermes@kodi:/etc/pulse $ usbsrv -list
+ 
+ usbsrv -i
+ usbsrv -clients
+
+
+To uninstall, run /usr/local/usb-redirector/uninstall.sh
+
+
+================= USB SERVER OPERATION SUCCESSFUL ===============
+List of local USB devices:
+
+   1: USB Optical Mouse USB Human Interface Device - Mouse
+      Vid: 04f2   Pid: 0939   Port: 1-1.5
+      Status: plugged
+
+   2: USB Keyboard Eleen Composite USB Device
+      Vid: 1231   Pid: 805a   Port: 1-1.3
+      Status: plugged
+
+   3: AN-VC300 LGE Composite USB Device
+      Vid: 043e   Pid: 3008   Port: 1-1.2.1
+      Status: plugged
+
+   4: USB Device vendor_id 0x0424 - product_id 0xec00
+      Vid: 0424   Pid: ec00   Port: 1-1.1
+      Status: plugged
+
+   5: USB Device vendor_id 0x0a12 - product_id 0x0001 USB Wireless Radio Frequency Bluetooth Device
+      Vid: 0a12   Pid: 0001   Port: 1-1.4
+      Status: plugged
+
+   6: AN-VC300 Camera LGE Composite USB Device
+      Vid: 043e   Pid: 3007   Port: 1-1.2.4
+      Status: plugged, shared
+ 
+ pour partager la camera
+ usbsrv -share 6
+ 
+ pour partager le micro
+ usbsrv -share 3
+ 
+ pour cesser le partage
+ usbsrv -unshare -3
+ usbsrv -unshare -6
