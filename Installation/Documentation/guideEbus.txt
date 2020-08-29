@@ -34,6 +34,8 @@ ebusctl scan 8
 
 ebusctl scan 15
 15;Vaillant;E7C00;0211;7402;21;16;38;0020118071;0082;046518;N9
+ou
+15;Vaillant;E7C00;0211;7402
 
 Vérifier que tout est ok
 ebusctl info
@@ -84,6 +86,31 @@ address 15: slave #2, scanned "MF=Vaillant;ID=E7C00;SW=0211;HW=7402", loaded "va
 address 31: master #8, ebusd
 address 36: slave #8, ebusd
 
+ou
+hermes@kodi:~ $ ebusctl info
+version: ebusd 3.4.v3.4-16-g9e152da
+update check: revision v3.4 available, broadcast.csv: different version available, memory.csv: different version available, vaillant/08.bai.csv: different version available, vaillant/broadcast.csv: different version available, vaillant/errors.inc: different version available, vaillant/general.csv: different version available, vaillant/hcmode.inc: different version available
+access: *
+signal: acquired
+symbol rate: 59
+max symbol rate: 108
+min arbitration micros: 128
+max arbitration micros: 348
+min symbol latency: 5
+max symbol latency: 34
+reconnects: 0
+masters: 3
+messages: 400
+conditional: 2
+poll: 0
+update: 10
+address 03: master #11
+address 08: slave #11, scanned "MF=Vaillant;ID=BAI00;SW=0316;HW=0903", loaded "vaillant/bai.0010015384.inc" ([PROD='0010015384']), "vaillant/08.bai.csv"
+address 10: master #2
+address 15: slave #2, scanned "MF=Vaillant;ID=E7C00;SW=0211;HW=7402", loaded "vaillant/15.e7c.csv"
+address 31: master #8, ebusd
+address 36: slave #8, ebusd
+
 
 
 Liste des registres ayant une valeur
@@ -95,7 +122,9 @@ ebusctl read -f -c bai FlowTempDesired
 depuis le 20/10/19 0.00
 
 T° instantanée de la pièce où est le thermostat
-ebusctl read -f -c e7c RoomTemp
+ebusctl read -f -c e7c AmbiantTemp2
+
+rem : pendant longtemps utilisation de RoomTemp mais en été cette valeur est restée à "16.00:64" interprétée comme 20.5 seulement alors que la valeur de AmbiantTemp2 était affichée : changement le 19/07/2020
 
 T° de consigne du thermostat
 ebusctl read -f -c e7c ROCRoomSet
@@ -170,3 +199,12 @@ Analyse : le fichier a une erreur en ligne 149 avec le fieldtype ECOMODE
 -> nouvelle erreur
 2020-04-16 22:09:26.022 [main error] error reading scan config file vaillant/08.bai.csv for ID "bai00", SW0316, HW0903: ERR: missing argument, vaillant/08.bai.csv:20: ERR: missing argument, circuit
 -> la configuration prise en compte était celle de langue allemande (de) : amélioration avec la langue anglaise (en)
+
+19/07/2020 : impossible de lire des valeurs
+ex ebusctl read -f -c bai FlowTempDesired
+=> ERR: element not found
+
+après le passage de cette commande :
+sudo /usr/bin/ebusd  -c /etc/ebusd  --checkconfig
+
+la lecture s'est remise à fonctionner

@@ -378,6 +378,10 @@ install_ssh () {
 install_ebus () {
 	echo "${cyan}Start installation ebus${white}"
 	echo "${cyan}Build ebusd server${white}"
+	ebus_ip=192.168.31.50
+	read -p "Enter ip address of the remote ebus [${ebus_ip}]" ebus_ip
+	ebus_ip=${ebus_ip:-192.168.0.50}
+	echo "${cyan}ebus ip =${ebus_ip} ${white}"
 	cd ~
 	sudo apt -y install git autoconf automake g++ make libmosquitto-dev
 	git clone https://github.com/john30/ebusd.git
