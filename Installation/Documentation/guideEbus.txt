@@ -111,6 +111,33 @@ address 15: slave #2, scanned "MF=Vaillant;ID=E7C00;SW=0211;HW=7402", loaded "va
 address 31: master #8, ebusd
 address 36: slave #8, ebusd
 
+après le 29 aout 2020
+
+version: ebusd 3.4.v3.4-20-gedfe09a
+update check: revision v3.4 available, broadcast.csv: different version available, memory.csv: different version available, vaillant/08.bai.csv: different version available, vaillant/broadcast.csv: different version available, vaillant/errors.inc: different version available, vaillant/general.csv: different version available, vaillant/hcmode.inc: different version available
+access: *
+signal: acquired
+symbol rate: 23
+max symbol rate: 96
+min arbitration micros: 86
+max arbitration micros: 255
+min symbol latency: 6
+max symbol latency: 24
+reconnects: 0
+masters: 3
+messages: 207
+conditional: 0
+poll: 0
+update: 10
+address 03: master #11
+address 08: slave #11, scanned "MF=Vaillant;ID=BAI00;SW=0316;HW=0903", loaded "vaillant/bai.0010015384.inc" ([PROD='0010015384']), "vaillant/08.bai.csv"
+address 10: master #2
+address 15: slave #2, scanned "MF=Vaillant;ID=E7C00;SW=0211;HW=7402"
+address 31: master #8, ebusd
+address 36: slave #8, ebusd
+
+
+
 
 
 Liste des registres ayant une valeur

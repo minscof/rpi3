@@ -5,6 +5,8 @@
 #
 # Count the number of lines in a given list of files.
 # Uses a for loop over all arguments.
+# modules are composed of routines
+# eg. modules
 #
 # Options:
 #  -h        ... help message
@@ -17,6 +19,15 @@
 # Limitations:
 #  . only one option should be given; a second one overrides
 #  . must be launched with user privilege that can do sudo command
+#
+############################################################################
+
+
+############################################################################
+#
+# role : set of modules
+# module : set of routines
+# routine : elementary task
 #
 ############################################################################
 
@@ -636,12 +647,15 @@ security_iptables () {
 	-A OUTPUT -p udp -m udp --dport 5353 -j ACCEPT -m comment --comment \"mDNS 5353\"
 
 	# Allow DHCP
-	-A INPUT - udp --sport 68 --dport 67 -j ACCEPT -m comment --comment \"dhcp 68 & 67\"
+	-A INPUT -p udp --sport 68 --dport 67 -j ACCEPT -m comment --comment \"dhcp 68 & 67\"
 
 	# Allow  squeezeboz server on port 3483
 	-A INPUT -p udp -m udp --dport 3483 -j ACCEPT -m comment --comment \"squeezebox server\"
 	-A INPUT -p tcp -m tcp --dport 3483 -j ACCEPT -m comment --comment \"squeezebox server\"
-	-A INPUT -s ${lan_network}/24 -m udp --dport 17784 -j ACCEPT -m comment --comment \"squeezebox server\"
+	-A INPUT -s ${lan_network}/24 -p udp -m udp --dport 17784 -j ACCEPT -m comment --comment \"squeezebox server\"
+
+	# Allow  vpn wireguard server on port 51820
+	-A INPUT -p udp -m udp --dport 51820 -j ACCEPT -m comment --comment \"vpn wireguard\"
 
 	# drop dropbox sync and add comment to remove log
 	-A INPUT -p udp --dport 17500 -j DROP -m comment --comment \"dropbox lan\"
@@ -664,7 +678,7 @@ security_iptables () {
 	# netbios broadcast
 	-A INPUT -s ${lan_network}/24 -p udp -m udp --sport=137 --dport=137 -m comment --comment netbios -j DROP
     -A INPUT -s ${lan_network}/24 -p udp -m udp --sport=138 --dport=138 -m comment --comment netbios -j DROP
-    
+
 	#  Log iptables denied calls
 	-A INPUT -m limit --limit 5/min -j LOG --log-prefix \"iptables denied: \" --log-level 7
 
@@ -1061,6 +1075,72 @@ install_desktop () {
 	echo "${cyan}End installation graphical environnement (desktop)${white}"
 }
 
+#parameters
+# #1 : version of nodejs, default 12
+install_nodejs () {
+	version=${${1}:-12}
+	echo "${cyan}Start installation nodejs server version ${version}${white}"
+	#install latest v12 version (compatibility with room assistant)
+	curl -sL https://deb.nodesource.com/setup_${version}.x | sudo bash -
+	sudo apt-get install -y nodejs
+	echo "${cyan}End installation nodejs version $(node -v)${white}"
+}
+
+#parameters
+# #1 : instanceName of room-assistant, default hostname
+# #2 : IP address of mqtt server, default 192.168.0.30
+# #3 : user for installation, defaut hermes
+install_room_assistant () {
+	echo "${cyan}Start installation room assistant${white}"
+	room_name=${${1}:-$(hostname)}
+	mqtt_ip=${${2}:-192.168.0.30}
+	user=${${3}:-hermes}
+	echo "${cyan}Room = ${room_name}, mqtt_ip = ${mqtt_ip}, user = ${user}${white}"
+	#todo check if node is installed
+	sudo apt-get install -y libavahi-compat-libdnssd-dev
+	sudo npm i --global --unsafe-perm room-assistant
+
+	sudo setcap cap_net_raw+eip $(eval readlink -f `which node`)
+	sudo setcap cap_net_raw+eip $(eval readlink -f `which hcitool`)
+	sudo setcap cap_net_admin+eip $(eval readlink -f `which hciconfig`)
+	
+	sudo sh -c "cat > /etc/systemd/system/room-assistant.service <<-EOF
+	[Unit]
+	Description=room-assistant service
+
+	[Service]
+	ExecStart=/usr/local/bin/room-assistant
+	WorkingDirectory=/home/${user}/room-assistant
+	Restart=always
+	RestartSec=10
+	User=${user}
+
+	[Install]
+	WantedBy=multi-user.target
+	EOF"
+
+	sudo systemctl enable room-assistant.service
+	sudo systemctl start room-assistant.service
+	
+	sh -c "cat > /home/hermes/room-assistant/config/local.yml <<-EOF
+	global:
+	  integrations:
+	    - homeAssistant
+	    - bluetoothLowEnergy
+	instanceName: ${room_name}
+	homeAssistant:
+	  mqttUrl: 'mqtt://${mqtt_ip}:1883'
+	  mqttOptions:
+	    username: room-assistant
+	    password: yourpass
+	bluetoothLowEnergy:
+	  whitelist:
+	    - f046000b8b01
+	EOF"
+
+	echo "${cyan}End installation room assistant${white}"
+}
+
 
 configure_rdp () {
 	sudo apt-get install -y freerdp2-x11
@@ -1221,8 +1301,8 @@ do
 			${routine}
 			;;
 		nginx)
-			echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
-			#${routine}
+			#echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
+			${routine}
 			;;
 		kodi)
 			echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
@@ -1230,14 +1310,18 @@ do
 		mqtt)
 			echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
 			;;
-		ebusd)
-			#install_ebus
-			echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
+		ebus)
+			install_ebus
+			#echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
 			;;
 		blea)
 			echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
 			;;
 		desktop)
+			#echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
+			${routine}
+			;;
+		iptables)
 			#echo "Routine ${yellow}${routine} already configured on this server, skip...${white}"
 			${routine}
 			;;

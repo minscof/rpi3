@@ -1,4 +1,5 @@
 #!/bin/bash
+# deprecated => install-rpi.sh
 #this shell must be launched with user privilege that can do sudo command
 #set -x
 
