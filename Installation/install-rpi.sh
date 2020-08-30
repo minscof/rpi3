@@ -1078,8 +1078,14 @@ install_desktop () {
 #parameters
 # #1 : version of nodejs, default 12
 install_nodejs () {
-	version=${${1}:-12}
+	version=${1:-12}
 	echo "${cyan}Start installation nodejs server version ${version}${white}"
+	arch=$(uname -m)
+	if [ $arch == "armv6l"]; then
+		echo "exit because armv6l"
+		exit 1
+	fi
+	#si armv6 , voir ce post raspberrypi.org/forums/viewtopic.php?t=229881
 	#install latest v12 version (compatibility with room assistant)
 	curl -sL https://deb.nodesource.com/setup_${version}.x | sudo bash -
 	sudo apt-get install -y nodejs
@@ -1092,9 +1098,9 @@ install_nodejs () {
 # #3 : user for installation, defaut hermes
 install_room_assistant () {
 	echo "${cyan}Start installation room assistant${white}"
-	room_name=${${1}:-$(hostname)}
-	mqtt_ip=${${2}:-192.168.0.30}
-	user=${${3}:-hermes}
+	room_name=${1:-$(hostname)}
+	mqtt_ip=${2:-192.168.0.30}
+	user=${3:-hermes}
 	echo "${cyan}Room = ${room_name}, mqtt_ip = ${mqtt_ip}, user = ${user}${white}"
 	#todo check if node is installed
 	sudo apt-get install -y libavahi-compat-libdnssd-dev
