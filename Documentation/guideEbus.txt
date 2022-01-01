@@ -14,7 +14,9 @@ eBUS signal: acquired
 
 
 Lancer le serveur ebusd sur rpi kodi
-systemctl start ebusd
+sudo systemctl start ebusd
+Arrêter le serveur
+sudo systemctl stop ebusd
 
 -> vérifier le fichier de configuration : /etc/default/ebusd
 -> vérifier que le répertoire /etc/ebusd existe et pointe sur la version anglaise des configurations ebusd 
@@ -184,6 +186,16 @@ tester la publication via mqtt des données reçues
 mosquitto_sub -h [MQTT Host] -t '#' -v
 [MQTT Host] = 127.0.0.1 si même machine, sinon 192.168.0.30 a priori
 ex : mosquitto_sub -h 127.0.0.1 -t '#' -v
+
+pour lire le contenu d'une variable : 
+mosquitto_pub -h 192.168.0.30 -t 'ebusd/e7c/ROCRoomSet/get' -m ''
+pour activer une lecture régulière de cette valeur on peut ajouter un ? suivi d'un chiffre entre 1 et 9
+on ne peut pas annuler ce polling, plus le chiffre est grand plus le polling est lent
+mosquitto_pub -h 192.168.0.30 -t 'ebusd/e7c/ROCRoomSet/get' -m '?9'
+mosquitto_pub -h 127.0.0.1 -t 'ebusd/e7c/ROCRoomSet/get' -m ''
+
+pour mettre à jour une variable
+ mosquitto_pub -h 192.168.0.30 -t 'ebusd/e7c/ROCRoomSet/set' -m '15'
 =====================
 activer les logs d'ebusd 
 -l, --logfile=FILE

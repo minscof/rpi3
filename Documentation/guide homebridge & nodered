@@ -1,0 +1,32 @@
+Homebridge et nodered sont installés sur le serveur jeedomSec
+
+Homebridge gère
+- le dialogue avec google assistant 
+- la prise wemo
+- le thermostat Saunier Duvall E7C via la passerelle ebus
+
+Pour cela, homebridge a les plugins
+- Homebridge-UI - v4.41.5
+- Homebridge Google Smart Home - v2.2.0
+- Homebridge Mqttthing - v1.1.37
+- Homebridge Wemo - v4.5.2
+
+Homebridge est en version v1.3.9 avec node.je v16.13.1 et npm v8.1.2
+
+L'accès à homebridge se fait avec cette url : http://192.168.0.9:8581/
+
+Pour google assistant, le compte utilisé est thierry.le_signor@gmail.com
+
+
+
+
+
+
+
+
+
+Nodered sert essentiellement à lire les données du thermostat de la chambre toutes les minutes pour qu'elles soient publiées sur mqtt
+
+Sur ce server room-assistant est aussi installé, il fonctionne comme client mqtt
+
+Le serveur mqtt (mosquitto) est sur le serveur kodi  192.168.0.30

@@ -1086,6 +1086,9 @@ install_nodejs () {
 		exit 1
 	fi
 	#si armv6 , voir ce post raspberrypi.org/forums/viewtopic.php?t=229881
+	
+	# install node and npm for rpi1 or rpi zero
+	#sudo curl -Lf# "https://unofficial-builds.nodejs.org/download/release/v12.18.3/node-v12.18.3-linux-armv6l.tar.gz" | sudo tar xzf - -C /usr/local --strip-components=1 --no-same-owner
 	#install latest v12 version (compatibility with room assistant)
 	curl -sL https://deb.nodesource.com/setup_${version}.x | sudo bash -
 	sudo apt-get install -y nodejs
@@ -1096,12 +1099,20 @@ install_nodejs () {
 # #1 : instanceName of room-assistant, default hostname
 # #2 : IP address of mqtt server, default 192.168.0.30
 # #3 : user for installation, defaut hermes
+#
+# tips : if error at startup like [ClusterService] Cannot find module '../build/Release/dns_sd_bindings'
+# you need to rebuild mdns module (cf. https://github.com/homebridge/homebridge/issues/905#issuecomment-274251797)
+# cd /usr/local/lib/node_modules/room-assistant/
+# sudo npm install --unsafe-perm mdns
+# sudo npm rebuild --unsafe-perm
+
 install_room_assistant () {
 	echo "${cyan}Start installation room assistant${white}"
 	room_name=${1:-$(hostname)}
 	mqtt_ip=${2:-192.168.0.30}
 	user=${3:-hermes}
 	echo "${cyan}Room = ${room_name}, mqtt_ip = ${mqtt_ip}, user = ${user}${white}"
+	mkdir -p /home/${user}/room-assistant/config
 	#todo check if node is installed
 	sudo apt-get install -y libavahi-compat-libdnssd-dev
 	sudo npm i --global --unsafe-perm room-assistant
